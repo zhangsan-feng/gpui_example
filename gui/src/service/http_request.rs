@@ -12,9 +12,6 @@ pub struct RestResponse<T> {
     pub msg: String,
 }
 
-
-
-
 trait ResponseHandler {
     async fn handle(self) -> Result<RestResponse<serde_json::Value>, anyhow::Error>;
 }

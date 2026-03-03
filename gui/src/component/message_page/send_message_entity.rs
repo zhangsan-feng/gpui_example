@@ -13,13 +13,13 @@ use tokio::fs::File;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 use crate::component::rgb_to_u32;
-use crate::service::http_request::RestResponse;
+use crate::service::http_request::{HttpClient, RestResponse};
 
 pub struct SendMessageEntity {
     text_input: Entity<InputState>,
     pick_send_files: Vec<PathBuf>,
     pub group_id: String,
-    pub history_message_panel_height: f32,
+    pub panel_height: f32,
     err_msg: String,
 }
 
@@ -30,7 +30,7 @@ impl SendMessageEntity {
             text_input: cx.new(|cx| InputState::new(window, cx)),
             pick_send_files: Vec::new(),
             group_id: String::new(),
-            history_message_panel_height: 160.0,
+            panel_height: 160.0,
             err_msg: String::new(),
         }
     }
@@ -55,10 +55,7 @@ impl SendMessageEntity {
 
                     entity_view.update(&mut async_cx, move |this, cx| {
                         let existing_set: HashSet<_> = this.pick_send_files.iter().collect();
-                        let mut new_files: Vec<_> = path_vec
-                            .into_iter()
-                            .filter(|p| !existing_set.contains(p))
-                            .collect();
+                        let mut new_files: Vec<_> = path_vec.into_iter().filter(|p| !existing_set.contains(p)).collect();
                         if new_files.len() > 5 || this.pick_send_files.len() > 5 {
                             new_files.truncate(5);
                             this.err_msg = "最多选择5个文件".to_string();
@@ -79,14 +76,12 @@ impl SendMessageEntity {
         })
         .detach();
     }
-
 }
 
 impl Render for SendMessageEntity {
     fn render (&mut self, window: &mut Window, cx: &mut Context<Self>, ) -> impl IntoElement {
-
         v_flex()
-            .h(px(self.history_message_panel_height))
+            .h(px(self.panel_height))
             .w_full()
             .py_2()
             .px_2()
@@ -183,10 +178,10 @@ impl Render for SendMessageEntity {
                                 let address = global_state.read(cx).http_server.clone();
                                 let msg = this.text_input.read(cx).text().to_string();
                                 let pick_files = this.pick_send_files.clone();
-                                info!("{}", msg);
 
+                                info!("{}", msg);
                                 cx.spawn( |_, _: &mut AsyncApp| async move {
-                                    tokio_handler.spawn(async move {
+                                    let res = tokio_handler.spawn(async move {
 
                                         let mut form = multipart::Form::new()
                                             .text("send_user_id", user_id.to_string())
@@ -213,51 +208,25 @@ impl Render for SendMessageEntity {
                                             form = form.part("files", part);
                                         }
 
+                                        let response = HttpClient::new().post_form(format!("{}/user_send_message", address), form).await;
+                                        response
 
-                                        let client = reqwest::Client::new();
-                                        let response = match client
-                                            .post(format!("{}/user_send_message", address))
-                                            .multipart(form)
-                                            .send()
-                                            .await {
-                                            Ok(r) => r,
-                                            Err(e) => {
-                                                eprintln!("请求失败: {}", e);
-                                                return;
-                                            }
-                                        };
-
-                                        let response_status = response.status();
-
-                                        if response_status.is_success() {
-                                            let text = match response.text().await {
-                                                Ok(t) => t,
-                                                Err(e) => {
-
-                                                    eprintln!("读取响应失败: {}", e);
-                                                    return;
-                                                }
-                                            };
-
-                                            let resp: RestResponse<serde_json::Value> = match serde_json::from_str(&text) {
-                                                Ok(r) => r,
-                                                Err(e) => {
-                                                    eprintln!("JSON 解析失败: {}", e);
-                                                    return;
-                                                }
-                                            };
+                                    });
+                                    match res.await {
+                                        Ok(Ok(r)) => {
 
                                         }
-                                        
-                                    })
+                                        Ok(Err(e)) => println!("http error: {:?}", e),
+                                        Err(e) => println!("tokio runtime error: {:?}", e),
+                                    }
                                 })
                                 .detach();
-                                // entity_view.update(&mut async_cx, |this, cx|{
-                                //     this.err_msg = "发送失败".to_string()
-                                // });
 
-                                this.text_input.update(cx, |state, cx| state.set_value("", window, cx));
+                                this.text_input.update(cx, |state, cx| {
+                                    state.set_value("", window, cx);
+                                });
                                 this.pick_send_files.clear();
+
                             })),
                 ),
             )

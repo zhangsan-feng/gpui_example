@@ -26,14 +26,12 @@ pub struct State {
 }
 
 #[derive(Clone)]
-pub enum ChatMessage {
+pub enum EventBus {
     WebSocketText(String),
-    UserJoinGroup(String),
-    UserExitGroup(String),
-    SystemAlert { level: String, content: String },
+    ChangeMessageGroupSelectIndex(usize),
 }
 
-impl EventEmitter<ChatMessage> for State {}
+impl EventEmitter<EventBus> for State {}
 pub struct GlobalState(pub(crate) Entity<State>);
 impl Global for GlobalState {}
 
@@ -46,52 +44,10 @@ pub fn new_state(cx:&mut App){
 
 
 impl State {
-
-    // fn example(cx: &mut Context<Self>){
-    //
-    //
-    //     let mut async_cx = cx.to_async();
-    //     let model = cx.entity().clone();
-    //
-    //
-    //     let _ = cx.spawn(|_, _: &mut AsyncApp| async move {
-    //         model.update(&mut async_cx, |model, model_cx| {
-    //             model.ws_server = "Hello".to_string();
-    //             model_cx.notify();
-    //             model_cx.emit(ChatMessage::WebSocketText("12345".to_string()));
-    //
-    //         });
-    //     });
-    //
-    //
-    //     let state_handle = cx.global::<GlobalState>().0.clone();
-    //     state_handle.update(cx, |state, state_cx| {
-    //         state.http_server = "hello".to_string();
-    //         state.init_ws(state_cx);
-    //         state_cx.emit(ChatMessage::WebSocketText("hello".to_string()));
-    //     });
-    //
-    //
-    //     let state = state_handle.read(cx);
-    //     let a = &state.ws_server;
-    //
-    //     cx.subscribe(&state_handle, |this: &mut Self, _model, event: &ChatMessage, cx| {
-    //         println!("{:?}", this.http_server);
-    //         match event {
-    //             ChatMessage::UserExitGroup(txt)=>{}
-    //             ChatMessage::WebSocketText(txt)=>{
-    //                 println!("组件收到消息: {}", txt);
-    //                 cx.notify();
-    //             }
-    //             _ => {}
-    //         }
-    //         cx.notify();
-    //     }).detach();
-    // }
-
+    
     pub fn new(cx: &mut Context<Self>) -> Self {
         let tokio_runtime_handle = tokio::runtime::Handle::try_current().unwrap_or_else(|_| {
-            log::debug!("no tokio runtime found, creating one for Reqwest...");
+            log::debug!("no tokio runtime found");
             runtime().handle().clone()
         });
 
@@ -118,7 +74,7 @@ impl State {
         cx.spawn(|_, _: &mut AsyncApp| async move {
             while let Some(ws_msg) = rx.recv().await {
                 _ = entity.update(&mut async_cx, |_, cx| {
-                    cx.emit(ChatMessage::WebSocketText(ws_msg.0));
+                    cx.emit(EventBus::WebSocketText(ws_msg.0));
                 });
             }
         }).detach();

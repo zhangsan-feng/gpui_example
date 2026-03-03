@@ -11,6 +11,7 @@ use gpui_component::{StyleSized, h_flex, v_flex, InteractiveElementExt, IconName
 
 use log::info;
 use tokio::io::AsyncWriteExt;
+use crate::component::message_page::entity::GroupHistory;
 use crate::component::rgb_to_u32;
 
 
@@ -33,27 +34,35 @@ pub async fn download_and_open(file_url: &str, temp_file_path: &std::path::Path)
 }
 
 pub struct HistoryMessageEntity{
-
+    pub scroll_handle: gpui::ListState,
+    pub history_message:Vec<GroupHistory>
 }
 
-impl MessagePage {
+impl HistoryMessageEntity {
+    pub fn new(window: &mut Window, cx: &mut Context<Self>) ->Self  {
+        HistoryMessageEntity{
+            scroll_handle: ListState::new(0, ListAlignment::Bottom, px(100.)),
+            history_message: vec![],
+        }
+    }
+}
 
-
-    pub fn history_message_component(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+impl Render for HistoryMessageEntity {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let global_state = cx.global::<GlobalState>().0.read(cx).clone();
-        let history_message_scroll_handle = self.history_message_scroll_handle.clone();
+        let history_message_scroll_handle = self.scroll_handle.clone();
         let entity_view = cx.entity().clone();
 
-        if self.message_group.len() == 0 {
+        if self.history_message.len() == 0 {
             return div().into_any_element();
         }
-        let message = self.message_group[self.select_index].clone();
-
+        let message = self.history_message.clone();
+        
         h_flex()
-            .flex_grow()
+            .size_full()
             .child(
                 gpui::list(history_message_scroll_handle, move |index, window, app| {
-                    let message = message.history[index].clone();
+                    let message = message[index].clone();
 
                     let formatted_message: String = message
                         .message
@@ -72,7 +81,7 @@ impl MessagePage {
                         let file_path = file.to_string().clone();
                         let global_state = global_state.clone();
 
-                            div()
+                        div()
                             .px_4()
                             .id(id)
                             // .hover(|mut style|{
@@ -110,24 +119,24 @@ impl MessagePage {
                     let message_content = v_flex()
                         .child(
                             if global_state.user_state.user_id.clone() == message.send_user_id {
-                                Label::new(message.send_user_name).text_right()
+                                Label::new(message.send_username).text_right()
                             }else{
-                                Label::new(message.send_user_name)
+                                Label::new(message.send_username)
                             }
-                           )
+                        )
                         .child(
-                        if message.files.is_empty() {
-                            Label::new(formatted_message)
-                                .bg(rgb(rgb_to_u32(228, 231, 235)))
-                                .p_2()
-                                .rounded(px(4.))
-                                .into_any_element()
-                        } else {
-                            h_flex()
-                                .children(message_image)
-                                .into_any_element()
-                        },
-                    );
+                            if message.files.is_empty() {
+                                Label::new(formatted_message)
+                                    .bg(rgb(rgb_to_u32(228, 231, 235)))
+                                    .p_2()
+                                    .rounded(px(4.))
+                                    .into_any_element()
+                            } else {
+                                h_flex()
+                                    .children(message_image)
+                                    .into_any_element()
+                            },
+                        );
 
                     let avatar = div().child(
                         Avatar::new().src(message.send_user_avatar)
@@ -150,13 +159,13 @@ impl MessagePage {
                             .into_any_element()
                     }
                 })
-                .size_full()
-                .p_2()
-                .mb(px(20.))
-                .into_any_element(),
+                    .size_full()
+                    .p_2()
+                    .mb(px(20.))
+                    .into_any_element(),
             )
             .child(
-                Scrollbar::vertical(&self.history_message_scroll_handle)
+                Scrollbar::vertical(&self.scroll_handle)
                     .scrollbar_show(ScrollbarShow::Always)
                     .axis(ScrollbarAxis::Vertical),
             )

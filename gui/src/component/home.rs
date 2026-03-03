@@ -15,12 +15,11 @@ pub struct HomeView {
     pub select_page: i32,
     pub message_page:Entity<MessagePage>,
     is_maximized: bool,
-    restore_bounds: Option<gpui::Size<Pixels>>,
+    restore_bounds: Option<Bounds<Pixels>>,
 }
 
 impl HomeView {
     pub fn new(cx: &mut Context<LoginView>) {
-
 
         let mut window_options = WindowOptions::default();
         let window_size = size(px(1200.), px(700.));
@@ -54,9 +53,7 @@ impl HomeView {
 
             app.new(|c| Root::new(view, window, c))
         }).expect("");
-
     }
-
 
     pub fn top_sidebar(&self,  window: &mut Window, cx: &mut Context<Self>) ->  impl IntoElement {
         h_flex().w_full().h(px(40.0))
@@ -68,31 +65,34 @@ impl HomeView {
                     .child(
                         Button::new("min").label("min")
                             .on_click(cx.listener(|this, event ,window, cx|{
+                                cx.notify();
                                 window.minimize_window()
                             }))
                     )
                     .child(
                         Button::new("max").label("max")
-                            .on_click(cx.listener(|this, event ,window, cx|{
-
-                                println!("{:?}", this.restore_bounds);
+                            .on_click(cx.listener(|this, _event, window, cx| {
                                 if !this.is_maximized {
-                                    window.zoom_window();
+                                    this.restore_bounds = Some(window.bounds());
+
+                                    if let Some(display) = window.display(cx) {
+                                        let usable_bounds = display.visible_bounds();
+                                        window.zoom_window();
+                                        window.resize(usable_bounds.size);
+                                    }
 
                                     this.is_maximized = true;
-                                    this.restore_bounds = Some(window.viewport_size());
-
                                 } else {
+                                    if let Some(bounds) = this.restore_bounds {
+                                        window.zoom_window();
+                                        window.resize(bounds.size);
+                                    }
 
-                                    window.resize(this.restore_bounds.expect("restore_bounds"));
                                     this.is_maximized = false;
-                                    this.restore_bounds = Some(window.viewport_size());
                                 }
 
-
-
+                                cx.notify();
                             }))
-
                     )
                     .child(
                         Button::new("close").label("close")
@@ -107,17 +107,12 @@ impl HomeView {
 
 impl Render for HomeView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // v_resizable("")
-        let width = window.bounds().clone().size.width;
-        // let height = w.bounds().clone().size.height
-
 
 
         let icons = [
             "icon/message_icon.png",
             "icon/user_icon.png"
         ];
-
 
         v_flex()
             .size_full()

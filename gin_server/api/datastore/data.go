@@ -18,6 +18,7 @@ type User struct {
 }
 
 type GroupHistory struct {
+	GroupId        string   `json:"group_id"`
 	MessageId      string   `json:"message_id"`
 	SendGroupId    string   `json:"send_group_id"`
 	SendUserId     string   `json:"send_user_id"`
@@ -28,6 +29,7 @@ type GroupHistory struct {
 	Files          []string `json:"files"`
 }
 type GroupMembers struct {
+	GroupId  string `json:"group_id"`
 	Id       string `json:"id"`
 	Name     string `json:"name"`
 	Avatar   string `json:"avatar"`
@@ -45,23 +47,14 @@ type MessageGroup struct {
 }
 
 type WebSocketMessage struct {
-	GroupId string      `json:"group_id"`
-	Type    string      `json:"type"`
-	Data    interface{} `json:"data"`
+	Type string      `json:"type"`
+	Data interface{} `json:"data"`
 }
 
 var AllGroup map[string]*MessageGroup
 var AllUsers map[string]*User
 var UserAvatar []string
 var UserMapper map[string]string
-
-/*
-所有用户
-用户有哪些群
-	群里有哪些成员
-	群里历史消息
-用户有哪些好友
-*/
 
 const StaticAddress = "http://127.0.0.1:34332"
 

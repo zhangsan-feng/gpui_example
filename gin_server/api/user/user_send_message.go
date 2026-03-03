@@ -76,6 +76,7 @@ func UserSendMessageApi(r *gin.Context) {
 	}
 	if !exist {
 		groupMember := &datastore.GroupMembers{
+			GroupId:  group.ID,
 			Id:       req.SendUserId,
 			Name:     datastore.AllUsers[req.SendUserId].Name,
 			Avatar:   datastore.AllUsers[req.SendUserId].Avatar,
@@ -89,9 +90,8 @@ func UserSendMessageApi(r *gin.Context) {
 				log.Println(v.Name)
 				if datastore.AllUsers[v.Id].Conn != nil {
 					send := &datastore.WebSocketMessage{
-						Type:    datastore.WsMsgOtherJoinGroupChat,
-						Data:    group.Members,
-						GroupId: req.SendGroupId,
+						Type: datastore.WsMsgOtherJoinGroupChat,
+						Data: groupMember,
 					}
 					if err := datastore.AllUsers[v.Id].Conn.WriteMessage(websocket.TextMessage, []byte(gconv.String(send))); err != nil {
 						log.Println(err)
@@ -103,6 +103,7 @@ func UserSendMessageApi(r *gin.Context) {
 	}
 
 	sendMsg := &datastore.GroupHistory{
+		GroupId:        group.ID,
 		MessageId:      uuid.New().String(),
 		SendGroupId:    req.SendGroupId,
 		SendUserId:     req.SendUserId,

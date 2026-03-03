@@ -1,24 +1,39 @@
 use std::rc::Rc;
-use gpui::{div, px, rgb, size, Context, InteractiveElement, IntoElement, ParentElement, Styled, Window};
-use gpui_component::{h_flex, v_flex, v_virtual_list, Sizable};
+use gpui::{div, px, rgb, size, Context, InteractiveElement, IntoElement, ParentElement, Render, Styled, Window};
+use gpui_component::{h_flex, v_flex, v_virtual_list, Sizable, VirtualListScrollHandle};
 use gpui_component::avatar::Avatar;
 use gpui_component::divider::Divider;
 use gpui_component::label::Label;
 use gpui_component::menu::{ContextMenuExt, PopupMenu, PopupMenuItem};
 use gpui_component::scroll::{Scrollbar, ScrollbarAxis, ScrollbarShow};
+use crate::component::message_page::entity::GroupMembers;
 use crate::component::message_page::MessagePage;
 use crate::component::rgb_to_u32;
 use crate::state::GlobalState;
 
 
+pub struct GroupMemberEntity{
+    pub group_type:String,
+    pub group_users:Vec<GroupMembers>,
+    scroll_handle:VirtualListScrollHandle
+}
 
+impl GroupMemberEntity {
+    pub fn new( window: &mut Window, cx: &mut Context<Self>)->Self{
+        GroupMemberEntity{
+            group_type: "".to_string(),
+            group_users: vec![],
+            scroll_handle: VirtualListScrollHandle::new(),
+        }
+    }
+}
 
-impl MessagePage {
-    pub fn group_chat_member(&self,  window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+impl Render for GroupMemberEntity {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let entity_handle = cx.entity().clone();
 
 
-        if self.message_group.len() != 0 && self.message_group[self.select_index].group_type == "private"{
+        if self.group_users.len() != 0 && self.group_type == "private"{
             div().into_any_element()
         }else{
             v_flex()
@@ -36,33 +51,19 @@ impl MessagePage {
                         )
                         .child(Divider::horizontal().w_full())
                         .child(Label::new("群成员").p_2())
+                        .child(Divider::horizontal().w_full())
+
                         .child(
 
                             v_virtual_list(
                                 cx.entity().clone(),
                                 "group_member_component_vm_list",
-                                Rc::new(
-                                    self
-                                        .message_group
-                                        .get(self.select_index)
-                                        .map(|group| {
-                                            group
-                                                .members
-                                                .iter()
-                                                .map(|_| {
-                                                    let base_height = 50.0;
-                                                    let total_height = base_height;
-                                                    size(px(200.), px(total_height))
-                                                })
-                                                .collect::<Vec<_>>()
-                                        })
-                                        .unwrap_or_default()
-                                ),
+                                Rc::new(self.group_users.iter().map(|_| size(px(200.), px(50.))).collect()),
                                 |view, visible_range, _, cx| {
                                     visible_range
                                         .map(|index| {
 
-                                            let group_user = view.message_group[view.select_index].members[index].clone();
+                                            let group_user = view.group_users[index].clone();
                                             h_flex()
                                                 .id(("group-member-component", index))
                                                 .rounded(px(4.0))
@@ -77,11 +78,11 @@ impl MessagePage {
                                         })
                                         .collect()
                                 },
-                            ).track_scroll(&self.group_member_scroll_handle)
+                            ).track_scroll(&self.scroll_handle)
 
                         )
                         .child(
-                            Scrollbar::vertical(&self.group_member_scroll_handle)
+                            Scrollbar::vertical(&self.scroll_handle)
                                 .scrollbar_show(ScrollbarShow::Always)
                                 .axis(ScrollbarAxis::Vertical),
                         )
@@ -99,11 +100,8 @@ impl MessagePage {
 
                             },
                         )))
-                },
-                )
+                })
                 .into_any_element()
         }
-
-
     }
 }

@@ -63,9 +63,8 @@ func CreateGroupChat(r *gin.Context) {
 
 	datastore.AllGroup[groupUuid] = groupInfo
 	send := &datastore.WebSocketMessage{
-		GroupId: groupUuid,
-		Type:    datastore.WsMsgCreateGroupChat,
-		Data:    groupInfo,
+		Type: datastore.WsMsgCreateGroupChat,
+		Data: groupInfo,
 	}
 	//log.Println(groupInfo)
 	flag := false

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
 use gpui::*;
 use std::rc::Rc;
@@ -7,16 +8,14 @@ use crate::component::message_page::search_group_and_user_window::SearchGroupAnd
 
 use gpui_component::avatar::Avatar;
 use gpui_component::button::Button;
-use gpui_component::input::Input;
+use gpui_component::input::{Input, InputState};
 use gpui_component::label::Label;
 use gpui_component::scroll::{Scrollbar, ScrollbarAxis, ScrollbarShow};
-use gpui_component::{Root, Sizable, StyledExt, h_flex, v_flex, v_virtual_list};
+use gpui_component::{Root, Sizable, StyledExt, h_flex, v_flex, v_virtual_list, VirtualListScrollHandle};
 use gpui_component::menu::{ContextMenuExt, DropdownMenu, PopupMenu, PopupMenuItem};
 use crate::component::message_page::create_group_chat_window::CreateGroupChatWindow;
 use crate::component::rgb_to_u32;
 use crate::state::GlobalState;
-
-
 
 
 
@@ -51,6 +50,160 @@ impl MessagePage {
         window_options
     }
 
+    pub fn left_sidebar_vm_list(&self, cx: &mut Context<Self>)->impl IntoElement{
+        v_virtual_list(
+            cx.entity().clone(),
+            "left_sidebar_vm_list",
+            Rc::new(self.message_group.iter().map(|_| size(px(200.), px(70.))).collect()),
+            |this, visible_range, window, cx| {
+                visible_range
+                    .map(|vm_index| {
+
+                        let index = this.select_index.clone();
+                        let name = this.message_group[vm_index].name.clone();
+                        let max_chars = 15;
+                        let group_name = if name.chars().count() > max_chars {
+                            format!("{}...", name.chars().take(max_chars).collect::<String>())
+                        } else {
+                            name.to_string()
+                        };
+                        let group_id = this.message_group[vm_index].id.clone();
+                        let last_message = this.message_group[vm_index].history.last().cloned().unwrap_or_default();
+
+                        let mut last_message_ui = format!(
+                            "{}:{}",
+                            last_message.send_username,
+                            last_message.message.replace("\n", "").chars().take(max_chars).collect::<String>()
+                        );
+                        if last_message_ui == ":" {
+                            last_message_ui = "".to_string();
+                        }
+
+                        let mut message_len = this.message_group[vm_index].history.len();
+                        if message_len > 99 {
+                            message_len = 99
+                        }
+                        let message_len = message_len.to_string();
+
+                        let time_str = &last_message.time;
+
+                        let message_time = if let Ok(naive_dt) = NaiveDateTime::parse_from_str(time_str, "%Y-%m-%d %H:%M:%S") {
+                            let dt: DateTime<Local> = Local.from_local_datetime(&naive_dt).unwrap();
+                            let now = Local::now();
+                            if dt.date_naive() == now.date_naive() {
+                                dt.format("%H:%M").to_string()
+                            } else {
+                                dt.format("%m-%d").to_string()
+                            }
+                        } else {
+                            time_str.clone()
+                        };
+
+                        h_flex()
+                            .id(("list-item", vm_index))
+                            .size_full()
+                            .hover(|mut style| {
+                                if index != vm_index {
+                                    style.background =
+                                        Some(rgb(rgb_to_u32(226, 226, 226)).into());
+                                }
+                                style
+                            })
+                            .rounded(px(12.))
+                            .on_click({
+                                cx.listener({
+                                    move |this, _, _, cx| {
+                                        this.select_index = vm_index.clone();
+                                        let group_data = this.message_group[this.select_index].clone();
+
+                                        if !this.click_column.contains_key(&group_data.id.to_string()) {
+                                            this.click_column.insert(group_data.id.to_string(), vm_index);
+                                        }
+                                        let group_id = this.message_group[this.select_index].id.clone();
+
+                                        this.sned_message_entity.update(cx, |this, cx| {
+                                            this.group_id = group_id.clone();
+                                        });
+
+                                        this.history_message_entity.update(cx, |this, cx|{
+                                            this.history_message = group_data.history.clone();
+                                            this.scroll_handle.reset(group_data.history.len());
+                                            cx.notify();
+                                        });
+
+                                        this.group_members_entity.update(cx, |this, cx|{
+                                            this.group_users = group_data.members.clone();
+                                            this.group_type = group_data.group_type.clone();
+                                            cx.notify();
+                                        });
+
+                                        // this.history_message_scroll_handle.reset(
+                                        //     this.message_group[this.select_index].history.len(),
+                                        // );
+                                    }
+                                })
+                            })
+                            .bg(if index == vm_index {
+                                rgb(rgb_to_u32(226, 226, 226))
+                            } else {
+                                rgb(rgb_to_u32(255, 255, 255))
+                            })
+                            .child(
+                                h_flex()
+                                    .size_full()
+                                    .p_2()
+                                    .child(
+                                        Avatar::new()
+                                            .src(this.message_group[vm_index].avatar.clone())
+                                            .with_size(gpui_component::Size::Size(px(
+                                                50.0,
+                                            ))),
+                                    )
+                                    .child(
+                                        v_flex()
+                                            .mr_4()
+                                            .size_full()
+                                            .child(
+                                                h_flex()
+                                                    .child(
+                                                        div()
+                                                            .w(px(200.))
+                                                            .child(group_name),
+                                                    )
+                                                    .child(div().flex_grow())
+                                                    .child(message_time),
+                                            )
+                                            .child(
+                                                h_flex()
+                                                    .child(last_message_ui)
+                                                    .child(div().flex_grow())
+                                                    .child(
+                                                        if this.click_column.contains_key(&group_id.to_string())
+                                                            || message_len == "0" || this.select_index == vm_index {
+                                                            div()
+                                                        } else {
+                                                            div()
+                                                                .paddings(px(2.0))
+                                                                .text_center()
+                                                                .child(Label::new(
+                                                                    message_len,
+                                                                ))
+                                                                .bg(rgb(rgb_to_u32(
+                                                                    252, 90, 78,
+                                                                )))
+                                                                .rounded_full()
+                                                        },
+                                                    ),
+                                            ),
+                                    ),
+                            )
+                    })
+                    .collect()
+            }
+        )
+            .h_full()
+            .track_scroll(&self.message_group_scroll_handle)
+    }
 
     pub fn left_sidebar(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
 
@@ -111,155 +264,7 @@ impl MessagePage {
                     ),
             )
             .child(
-                v_virtual_list(
-                    cx.entity().clone(),
-                    "left_sidebar_vm_list",
-                    Rc::new(
-                        self.message_group
-                            .iter()
-                            .map(|_| size(px(200.), px(70.)))
-                            .collect(),
-                    ),
-                    |this, visible_range, window, cx| {
-                        visible_range
-                            .map(|vm_index| {
-
-                                let index = this.select_index.clone();
-                                let name = this.message_group[vm_index].name.clone();
-                                let max_chars = 15;
-                                let group_name = if name.chars().count() > max_chars {
-                                    format!("{}...", name.chars().take(max_chars).collect::<String>())
-                                } else {
-                                    name.to_string()
-                                };
-                                let group_id = this.message_group[vm_index].id.clone();
-                                let last_message = this.message_group[vm_index].history.last().cloned().unwrap_or_default();
-
-                                let mut last_message_ui = format!(
-                                    "{}:{}",
-                                    last_message.send_user_name,
-                                    last_message.message.replace("\n", "").chars().take(max_chars).collect::<String>()
-                                );
-                                if last_message_ui == ":" {
-                                    last_message_ui = "".to_string();
-                                }
-
-                                let mut message_len = this.message_group[vm_index].history.len();
-                                if message_len > 99 {
-                                    message_len = 99
-                                }
-                                let message_len = message_len.to_string();
-
-                                let time_str = &last_message.time;
-
-                                let message_time = if let Ok(naive_dt) = NaiveDateTime::parse_from_str(time_str, "%Y-%m-%d %H:%M:%S") {
-                                    let dt: DateTime<Local> = Local.from_local_datetime(&naive_dt).unwrap();
-                                    let now = Local::now();
-                                    if dt.date_naive() == now.date_naive() {
-                                        dt.format("%H:%M").to_string()
-                                    } else {
-                                        dt.format("%m-%d").to_string()
-                                    }
-                                } else {
-                                    time_str.clone()
-                                };
-
-                                h_flex()
-                                    .id(("list-item", vm_index))
-                                    .size_full()
-                                    .hover(|mut style| {
-                                        if index != vm_index {
-                                            style.background =
-                                                Some(rgb(rgb_to_u32(226, 226, 226)).into());
-                                        }
-                                        style
-                                    })
-                                    .rounded(px(12.))
-                                    .on_click({
-
-                                        let group_id_clone = group_id.clone();
-                                        let vm_index_clone = vm_index.clone();
-
-                                        cx.listener({
-
-                                            move |this, _, _, cx| {
-                                                this.select_index = vm_index_clone.clone();
-                                                if !this.click_column.contains_key(&group_id_clone.to_string()) {
-                                                    this.click_column.insert(group_id_clone.to_string(), vm_index_clone);
-                                                }
-                                                let group_id = this.message_group[this.select_index].id.clone();
-
-                                                this.sned_message_component.update(cx, |this, cx| {
-                                                    this.group_id = group_id.clone();
-                                                });
-
-                                                this.history_message_scroll_handle.reset(
-                                                    this.message_group[this.select_index].history.len(),
-                                                );
-                                            }
-                                        })
-                                    })
-                                    .bg(if index == vm_index {
-                                        rgb(rgb_to_u32(226, 226, 226))
-                                    } else {
-                                        rgb(rgb_to_u32(255, 255, 255))
-                                    })
-                                    .child(
-                                        h_flex()
-                                            .size_full()
-                                            .p_2()
-                                            .child(
-                                                Avatar::new()
-                                                    .src(this.message_group[vm_index].avatar.clone())
-                                                    .with_size(gpui_component::Size::Size(px(
-                                                        50.0,
-                                                    ))),
-                                            )
-                                            .child(
-                                                v_flex()
-                                                    .mr_4()
-
-                                                    .size_full()
-                                                    .child(
-                                                        h_flex()
-                                                            .child(
-                                                                div()
-                                                                    .w(px(200.))
-                                                                    .child(group_name),
-                                                            )
-                                                            .child(div().flex_grow())
-                                                            .child(message_time),
-                                                    )
-                                                    .child(
-                                                        h_flex()
-                                                            .child(last_message_ui)
-                                                            .child(div().flex_grow())
-                                                            .child(
-                                                                if this.click_column.contains_key(&group_id.to_string())
-                                                                    || message_len == "0" || this.select_index == vm_index {
-                                                                    div()
-                                                                } else {
-                                                                    div()
-                                                                        .paddings(px(2.0))
-                                                                        .text_center()
-                                                                        .child(Label::new(
-                                                                            message_len,
-                                                                        ))
-                                                                        .bg(rgb(rgb_to_u32(
-                                                                            252, 90, 78,
-                                                                        )))
-                                                                        .rounded_full()
-                                                                },
-                                                            ),
-                                                    ),
-                                            ),
-                                    )
-                            })
-                            .collect()
-                    },
-                )
-                .h_full()
-                .track_scroll(&self.message_group_scroll_handle),
+                self.left_sidebar_vm_list(cx)
             )
             .context_menu(move |menu: PopupMenu, w: &mut Window, _cx: &mut Context<PopupMenu>| {
                     menu

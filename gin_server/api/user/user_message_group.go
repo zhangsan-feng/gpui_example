@@ -17,9 +17,9 @@ func MessageGroupApi(r *gin.Context) {
 		}
 	}
 
-	//for _, group := range datastore.AllGroup {
-	//	data = append(data, group)
-	//}
+	for _, group := range datastore.AllGroup {
+		data = append(data, group)
+	}
 
 	r.JSON(200, gin.H{
 		"code": "200",

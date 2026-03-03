@@ -30,6 +30,7 @@ func JoinGroupChatApi(r *gin.Context) {
 	if group != nil && user != nil {
 
 		groupMember := &datastore.GroupMembers{
+			GroupId:  group.ID,
 			Id:       user.Id,
 			Name:     user.Name,
 			Avatar:   user.Avatar,
@@ -56,9 +57,8 @@ func JoinGroupChatApi(r *gin.Context) {
 		}
 
 		send := datastore.WebSocketMessage{
-			GroupId: params.GroupId,
-			Type:    datastore.WsMsgUserJoinGroupChat,
-			Data:    group,
+			Type: datastore.WsMsgUserJoinGroupChat,
+			Data: group,
 		}
 		if err := datastore.AllUsers[params.UserId].Conn.WriteMessage(websocket.TextMessage, []byte(gconv.String(send))); err != nil {
 			log.Println(err)
@@ -68,9 +68,8 @@ func JoinGroupChatApi(r *gin.Context) {
 			if activeUser := datastore.AllUsers[_user.Id]; activeUser != nil {
 
 				send := datastore.WebSocketMessage{
-					GroupId: params.GroupId,
-					Type:    datastore.WsMsgOtherJoinGroupChat,
-					Data:    group.Members,
+					Type: datastore.WsMsgOtherJoinGroupChat,
+					Data: groupMember,
 				}
 				//log.Println(_user.Id, _user.Name, group.Members)
 

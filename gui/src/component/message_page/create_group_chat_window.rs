@@ -69,19 +69,19 @@ impl Render for CreateGroupChatWindow {
 
                                     info!("{:#?} ", paths);
 
-                                    if let Ok(result) = paths.await {
-                                        if let Ok(Some(path_vec)) = result {
-                                            if let Some(first_path) = path_vec.first() {
-                                                let path_str =
-                                                    first_path.to_string_lossy().to_string();
-                                                entity_view.update(&mut async_cx, |this, cx| {
-                                                    this.avatar_path =
-                                                        Some(path_str.replace("\\", "/").into());
-                                                    println!("{:?}", this.avatar_path);
-                                                });
-                                            }
-                                        }
-                                    }
+                                if let Some(path_str) = paths.await
+                                    .ok()                // Result -> Option
+                                    .and_then(|r| r.ok()) // Flatten Result<Option<T>> -> Option<T>
+                                    .flatten()           // 展平内层 Option，得到 Vec<PathBuf>
+                                    .and_then(|v| v.first().map(|p| p.to_string_lossy().to_string()))
+                                {
+                                    let normalized_path = path_str.replace("\\", "/");
+
+                                    entity_view.update(&mut async_cx, |this, cx| {
+                                        this.avatar_path = Some(normalized_path.into());
+                                        println!("{:?}", this.avatar_path);
+                                    });
+                                }
                                 })
                                 .detach();
                         }),
