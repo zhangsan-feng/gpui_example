@@ -1,25 +1,33 @@
 package user
 
 import (
-	"gin_server/api/datastore"
+	"gin_server/datastore"
+	"gin_server/entity"
 	"github.com/gin-gonic/gin"
 )
 
 func MessageGroupApi(r *gin.Context) {
-	user_id := r.Query("user_id")
+	userId := r.Query("user_id")
 	//log.Println(user_id)
-	user := datastore.AllUsers[user_id]
+	user := datastore.AllUsers[userId]
 	//log.Println(user)
-	data := []*datastore.MessageGroup{}
+	data := entity.UserDetailInfo{
+		Friends:       []*entity.FriendUser{},
+		MessageGroups: []*entity.MessageGroup{},
+	}
 	if user != nil {
 		for _, val := range user.MessageGroups {
-			data = append(data, datastore.AllGroup[val])
+			data.MessageGroups = append(data.MessageGroups, datastore.AllGroup[val])
+		}
+		for _, val := range user.Friends {
+			val.Status = ""
+			data.Friends = append(data.Friends, val)
 		}
 	}
 
-	for _, group := range datastore.AllGroup {
-		data = append(data, group)
-	}
+	//for _, group := range datastore.AllGroup {
+	//	data = append(data, group)
+	//}
 
 	r.JSON(200, gin.H{
 		"code": "200",

@@ -1,4 +1,4 @@
-use log::{error};
+use log::{error, info};
 use reqwest::multipart;
 use serde::{Deserialize, Serialize};
 
@@ -26,12 +26,12 @@ impl ResponseHandler for reqwest::Response {
             match serde_json::from_slice(&bytes) {
                 Ok(data) => Ok(data),
                 Err(err) => {
-                    error!("序列化失败: {}, 响应内容: {}", err, body_str);
+                    info!("序列化失败: {}, 响应内容: {}", err, body_str);
                     Err(anyhow::anyhow!("序列化失败: {}, 响应内容: {}", err, body_str))
                 }
             }
         } else {
-            error!("请求失败, 状态码: {}, 响应: {}", status, body_str);
+            info!("请求失败, 状态码: {}, 响应: {}", status, body_str);
             Err(anyhow::anyhow!("请求失败, 状态码: {}, 响应: {}", status, body_str))
         }
     }
@@ -53,7 +53,7 @@ impl HttpClient {
         let response = match self.client.get(&url).send().await {
             Ok(r) => r,
             Err(e) => {
-                error!("GET请求失败 [{}]: {}", url, e);
+                info!("GET请求失败 [{}]: {}", url, e);
                 return Err(anyhow::anyhow!("GET请求失败: {}", e));
             }
         };
@@ -65,7 +65,7 @@ impl HttpClient {
         let response = match self.client.post(&url).json(&body).send().await {
             Ok(r) => r,
             Err(e) => {
-                error!("POST请求失败 [{}]: {}", url, e);
+                info!("POST请求失败 [{}]: {}", url, e);
                 return Err(anyhow::anyhow!("POST请求失败: {}", e));
             }
         };
@@ -77,7 +77,7 @@ impl HttpClient {
         let response = match self.client.post(&url).multipart(form).send().await {
             Ok(r) => r,
             Err(e) => {
-                error!("POST表单请求失败 [{}]: {}", url, e);
+                info!("POST表单请求失败 [{}]: {}", url, e);
                 return Err(anyhow::anyhow!("POST表单请求失败: {}", e));
             }
         };

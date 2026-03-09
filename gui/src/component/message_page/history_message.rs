@@ -11,7 +11,7 @@ use gpui_component::{StyleSized, h_flex, v_flex, InteractiveElementExt, IconName
 
 use log::info;
 use tokio::io::AsyncWriteExt;
-use crate::component::message_page::entity::GroupHistory;
+use crate::component::GroupHistory;
 use crate::component::rgb_to_u32;
 
 
@@ -59,6 +59,7 @@ impl Render for HistoryMessageEntity {
         let message = self.history_message.clone();
         
         h_flex()
+            .mt_2()
             .size_full()
             .child(
                 gpui::list(history_message_scroll_handle, move |index, window, app| {
@@ -80,6 +81,8 @@ impl Render for HistoryMessageEntity {
                         let entity_view = entity_view.clone();
                         let file_path = file.to_string().clone();
                         let global_state = global_state.clone();
+                        // let video_extensions = [".mp4", ".avi", ".mkv", ".mov", ".flv"];
+                        let image_extensions = [".png", ".jpg", ".gif", ".svg", ".jpeg"];
 
                         div()
                             .px_4()
@@ -89,8 +92,16 @@ impl Render for HistoryMessageEntity {
                             //     style
                             // })
                             .child(
-                                img(file.to_string())
-                                    .size_with(gpui_component::Size::Size(px(80.0))).into_any_element()
+                                if image_extensions.iter().any(|&ext| file.contains(ext)) {
+                                    img(file.to_string())
+                                        .size_with(gpui_component::Size::Size(px(80.0)))
+                                        .into_any_element()
+                                }else{
+                                    div()
+                                        .child(file.to_string())
+                                        .into_any_element()
+                                }
+
                             )
                             .on_double_click(move |event, window, app| {
                                 let file_path = file_path.clone();
@@ -99,7 +110,6 @@ impl Render for HistoryMessageEntity {
                                     cx.spawn( |_, _: &mut AsyncApp| async move {
 
                                         global_state.tokio_handle.spawn(async move {
-
                                             let file_name = file_path.split('/').last().unwrap_or("");
                                             let mut temp_file_path: PathBuf = std::env::temp_dir();
                                             temp_file_path.push(file_name);
@@ -125,25 +135,22 @@ impl Render for HistoryMessageEntity {
                             }
                         )
                         .child(
-                            if message.files.is_empty() {
-                                Label::new(formatted_message)
-                                    .bg(rgb(rgb_to_u32(228, 231, 235)))
-                                    .p_2()
-                                    .rounded(px(4.))
-                                    .into_any_element()
-                            } else {
-                                h_flex()
+                            v_flex()
+                                .items_center()
+                                .bg(rgb(rgb_to_u32(228, 231, 235)))
+                                .p_2()
+                                .rounded(px(4.))
+                                .child(
+                                    Label::new(formatted_message)
+                                )
+                                .child(
+                                    h_flex()
                                     .children(message_image)
-                                    .into_any_element()
-                            },
+                                )
                         );
 
-                    let avatar = div().child(
-                        Avatar::new().src(message.send_user_avatar)
-                    );
-
-
-
+                    let avatar = div().child(Avatar::new().src(message.send_user_avatar));
+                    
                     if global_state.user_state.user_id.clone() == message.send_user_id {
                         element
                             .justify_end()

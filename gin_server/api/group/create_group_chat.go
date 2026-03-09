@@ -1,21 +1,28 @@
 package group
 
 import (
-	"gin_server/api/datastore"
+	"gin_server/datastore"
+	"gin_server/entity"
+	"gin_server/enum"
 	"github.com/gin-gonic/gin"
 	"github.com/gogf/gf/v2/os/gfile"
 	"github.com/gogf/gf/v2/util/gconv"
 	"github.com/google/uuid"
-	"github.com/gorilla/websocket"
 	"log"
 )
 
 type CreateGroupChatParams struct {
-	GroupName string   `json:"group_name" form:"group_name" binding:"required"`
+	GroupName string   `json:"group_name" form:"group_name"`
+	GroupId   string   `json:"group_id" form:"group_id"`
 	UserId    []string `json:"user_id" form:"user_id" binding:"required"`
 	Type      string   `json:"type" form:"type" binding:"required"`
 }
 
+/*
+		存在的直接返回
+		给用户发私聊 创建
+	    直接创建
+*/
 func CreateGroupChat(r *gin.Context) {
 	params := &CreateGroupChatParams{}
 	if bindError := r.ShouldBind(params); bindError != nil {
@@ -41,10 +48,10 @@ func CreateGroupChat(r *gin.Context) {
 	}
 
 	groupUuid := uuid.New().String()
-	groupMember := []*datastore.GroupMembers{}
+	groupMember := []*entity.GroupMembers{}
 
 	for _, userId := range params.UserId {
-		groupMember = append(groupMember, &datastore.GroupMembers{
+		groupMember = append(groupMember, &entity.GroupMembers{
 			Id:       datastore.AllUsers[userId].Id,
 			Name:     datastore.AllUsers[userId].Name,
 			Avatar:   datastore.AllUsers[userId].Avatar,
@@ -52,23 +59,23 @@ func CreateGroupChat(r *gin.Context) {
 			Status:   "",
 		})
 	}
-	groupInfo := &datastore.MessageGroup{
+	groupInfo := &entity.MessageGroup{
 		ID:      groupUuid,
 		Name:    params.GroupName,
 		Avatar:  datastore.StaticAddress + "/avatar/group_avatar/" + tmpFileName,
-		History: []*datastore.GroupHistory{},
+		History: []*entity.GroupHistory{},
 		Members: groupMember,
 		Type:    params.Type,
 	}
 
 	datastore.AllGroup[groupUuid] = groupInfo
 	send := &datastore.WebSocketMessage{
-		Type: datastore.WsMsgCreateGroupChat,
+		Type: enum.WsMsgCreateGroupChat,
 		Data: groupInfo,
 	}
 	//log.Println(groupInfo)
-	flag := false
 	for _, userId := range params.UserId {
+		flag := false
 		user := datastore.AllUsers[userId]
 		//log.Println(params.UserId)
 		if user != nil {
@@ -83,10 +90,7 @@ func CreateGroupChat(r *gin.Context) {
 			//log.Println(user.Id)
 			//log.Println(user.MessageGroups)
 
-			datastore.AllGroup[groupUuid] = groupInfo
-			if sendError := user.Conn.WriteMessage(websocket.TextMessage, []byte(gconv.String(send))); sendError != nil {
-				log.Println(sendError)
-			}
+			user.RealTimeMessage <- []byte(gconv.String(send))
 		}
 	}
 	r.JSON(200, gin.H{

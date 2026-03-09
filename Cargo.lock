@@ -2408,7 +2408,6 @@ dependencies = [
  "anyhow",
  "chrono",
  "fern",
- "futures-core",
  "futures-util",
  "gpui",
  "gpui-component",
@@ -2421,7 +2420,6 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "tokio-util",
- "uuid",
 ]
 
 [[package]]

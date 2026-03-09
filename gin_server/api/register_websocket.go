@@ -1,7 +1,7 @@
 package api
 
 import (
-	"gin_server/api/datastore"
+	"gin_server/datastore"
 	"github.com/gin-gonic/gin"
 	"github.com/gogf/gf/v2/util/gconv"
 	"github.com/gorilla/websocket"
@@ -25,12 +25,16 @@ func RegisterWsConn(r *gin.Context) {
 	if err != nil {
 		log.Println(err)
 	}
-	log.Println(gconv.Map(string(msg))["id"])
-	log.Println(gconv.Map(string(msg))["token"])
+	log.Println("userid:", gconv.Map(string(msg))["id"])
+	log.Println("user_token:", gconv.Map(string(msg))["token"])
 	id := gconv.String(gconv.Map(string(msg))["id"])
 
 	if datastore.AllUsers[id] != nil {
-		datastore.AllUsers[id].Conn = conn
+		datastore.AllUsers[id].WebSocketConn = conn
+		datastore.AllUsers[id].CloseWebSocketConnSignal = make(chan struct{})
+		datastore.AllUsers[id].RealTimeMessage = make(chan []byte, 1024)
+		go datastore.AllUsers[id].WebSocketConnWrite()
+		go datastore.AllUsers[id].WebSocketConnRead()
 	} else {
 		if connError := conn.Close(); connError != nil {
 			log.Println(connError)

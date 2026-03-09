@@ -90,8 +90,8 @@ impl Render for SendMessageEntity {
                     .ml_1()
                     .child(
                         div()
-                            .child(img("icon/icons8-folder-96.png").size(px(24.)))
                             .id("sned_message_component-folder-id")
+                            .child(img("icon/icons8-folder-96.png").size(px(24.)))
                             .p_1()
                             .rounded(px(4.))
                             .hover(|mut style| {
@@ -101,6 +101,21 @@ impl Render for SendMessageEntity {
                             .on_mouse_down(
                                 MouseButton::Left,
                                 cx.listener(|this, event, window, cx| this.pick_files(cx)),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .id("sned_message_component-folder-id")
+                            .child(img("icon/icons8-scissors-50.png").size(px(24.)))
+                            .p_1()
+                            .rounded(px(4.))
+                            .hover(|mut style| {
+                                style.background = Some(rgb(rgb_to_u32(235, 235, 235)).into());
+                                style
+                            })
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|this, event, window, cx| {}),
                             ),
                     )
                     .children(

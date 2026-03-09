@@ -14,43 +14,42 @@ use gpui_component::scroll::{Scrollbar, ScrollbarAxis, ScrollbarShow};
 use gpui_component::{Root, Sizable, StyledExt, h_flex, v_flex, v_virtual_list, VirtualListScrollHandle};
 use gpui_component::menu::{ContextMenuExt, DropdownMenu, PopupMenu, PopupMenuItem};
 use crate::component::message_page::create_group_chat_window::CreateGroupChatWindow;
+
 use crate::component::rgb_to_u32;
 use crate::state::GlobalState;
 
+pub fn window_center_options( window: &mut Window, w:f32, h:f32) -> WindowOptions {
+    let parent_bounds = window.bounds();
+    let parent_x = parent_bounds.origin.x;
+    let parent_y = parent_bounds.origin.y;
+
+    let parent_width = parent_bounds.size.width;
+    let parent_height = parent_bounds.size.height;
+
+    let child_x = parent_x + (parent_width - px(w)) / 2.0;
+    let child_y = parent_y + (parent_height - px(h)) / 2.0;
+    let mut window_options = WindowOptions::default();
+    let window_size = size(px(w), px(h));
+
+    let bounds = Bounds {
+        origin: Point { x: child_x, y:child_y },
+        size:window_size,
+    };
+    window_options.window_bounds = Some(WindowBounds::Windowed(bounds));
+
+    window_options.window_min_size = Some(window_size);
+    window_options.is_resizable = false;
+    window_options.titlebar = Some(TitlebarOptions {
+        title: Some(SharedString::from("")),
+        appears_transparent: false,
+        ..Default::default()
+    });
+    window_options
+}
 
 
 impl MessagePage {
-    
-    pub fn window_center_options(&self, window: &mut Window, w:f32, h:f32) -> WindowOptions {
-        let parent_bounds = window.bounds();
-        let parent_x = parent_bounds.origin.x;
-        let parent_y = parent_bounds.origin.y;
-
-        let parent_width = parent_bounds.size.width;
-        let parent_height = parent_bounds.size.height;
-
-        let child_x = parent_x + (parent_width - px(w)) / 2.0;
-        let child_y = parent_y + (parent_height - px(h)) / 2.0;
-        let mut window_options = WindowOptions::default();
-        let window_size = size(px(w), px(h));
-
-        let bounds = Bounds {
-            origin: Point { x: child_x, y:child_y },
-            size:window_size,
-        };
-        window_options.window_bounds = Some(WindowBounds::Windowed(bounds));
-
-        window_options.window_min_size = Some(window_size);
-        window_options.is_resizable = false;
-        window_options.titlebar = Some(TitlebarOptions {
-            title: Some(SharedString::from("")),
-            appears_transparent: false,
-            ..Default::default()
-        });
-        window_options
-    }
-
-    pub fn left_sidebar_vm_list(&self, cx: &mut Context<Self>)->impl IntoElement{
+    fn left_sidebar_vm_list(&self, cx: &mut Context<Self>)->impl IntoElement{
         v_virtual_list(
             cx.entity().clone(),
             "left_sidebar_vm_list",
@@ -58,17 +57,18 @@ impl MessagePage {
             |this, visible_range, window, cx| {
                 visible_range
                     .map(|vm_index| {
-
+                        let global_state = cx.global::<GlobalState>().0.clone().read(cx);
                         let index = this.select_index.clone();
-                        let name = this.message_group[vm_index].name.clone();
+                        let group = this.message_group[vm_index].clone();
+                        let mut group_avatar = group.avatar.clone();
+
+                        let name = group.name.clone();
+
                         let max_chars = 15;
-                        let group_name = if name.chars().count() > max_chars {
-                            format!("{}...", name.chars().take(max_chars).collect::<String>())
-                        } else {
-                            name.to_string()
-                        };
-                        let group_id = this.message_group[vm_index].id.clone();
-                        let last_message = this.message_group[vm_index].history.last().cloned().unwrap_or_default();
+                        let mut group_name = format!("{}...", name.chars().take(max_chars).collect::<String>());
+
+                        let group_id = group.id.clone();
+                        let last_message = group.history.last().cloned().unwrap_or_default();
 
                         let mut last_message_ui = format!(
                             "{}:{}",
@@ -79,7 +79,7 @@ impl MessagePage {
                             last_message_ui = "".to_string();
                         }
 
-                        let mut message_len = this.message_group[vm_index].history.len();
+                        let mut message_len = group.history.len();
                         if message_len > 99 {
                             message_len = 99
                         }
@@ -99,8 +99,18 @@ impl MessagePage {
                             time_str.clone()
                         };
 
+                        if group.group_type == "private_chat"{
+                            group.members.iter().for_each(|x|{
+                                if x.id != global_state.user_state.user_id{
+                                    group_avatar = x.avatar.clone();
+                                    group_name = format!("{}...", x.name.clone().chars().take(max_chars).collect::<String>())
+                                }
+                            })
+                        }
+
+
                         h_flex()
-                            .id(("list-item", vm_index))
+                            .id(("message-group-vm-list", vm_index))
                             .size_full()
                             .hover(|mut style| {
                                 if index != vm_index {
@@ -110,6 +120,9 @@ impl MessagePage {
                                 style
                             })
                             .rounded(px(12.))
+                            .on_mouse_down(MouseButton::Right, cx.listener(|this, _, _, cx|{
+
+                            }))
                             .on_click({
                                 cx.listener({
                                     move |this, _, _, cx| {
@@ -136,13 +149,10 @@ impl MessagePage {
                                             this.group_type = group_data.group_type.clone();
                                             cx.notify();
                                         });
-
-                                        // this.history_message_scroll_handle.reset(
-                                        //     this.message_group[this.select_index].history.len(),
-                                        // );
                                     }
                                 })
                             })
+
                             .bg(if index == vm_index {
                                 rgb(rgb_to_u32(226, 226, 226))
                             } else {
@@ -154,7 +164,7 @@ impl MessagePage {
                                     .p_2()
                                     .child(
                                         Avatar::new()
-                                            .src(this.message_group[vm_index].avatar.clone())
+                                            .src(group_avatar)
                                             .with_size(gpui_component::Size::Size(px(
                                                 50.0,
                                             ))),
@@ -183,6 +193,7 @@ impl MessagePage {
                                                             div()
                                                         } else {
                                                             div()
+
                                                                 .paddings(px(2.0))
                                                                 .text_center()
                                                                 .child(Label::new(
@@ -205,10 +216,56 @@ impl MessagePage {
             .track_scroll(&self.message_group_scroll_handle)
     }
 
-    pub fn left_sidebar(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-
+    fn add_btn_menu(&self, cx: &mut Context<Self>) ->impl IntoElement{
         let entity_handle = cx.entity().clone();
-        let entity_handle_2 = cx.entity().clone();
+        Button::new("left-sidebar-btn-menu")
+            .label("+")
+            .mx_2()
+            .dropdown_menu_with_anchor(Corner::TopLeft, move |menu, window, cx| {
+                menu.item(
+                    PopupMenuItem::new("创建群聊")
+                        .on_click(window.listener_for(&entity_handle.clone(), |this, event, window, cx|{
+                            let global_state = cx.global::<GlobalState>().0.clone();
+                            if global_state.read(cx).dial_window_is_open{
+                                return
+                            }
+
+                            let _ = cx.open_window(window_center_options(window, 350., 300.), move |window, app| {
+                                let view = app.new(|cx| CreateGroupChatWindow::new(cx, window));
+                                app.new(|cx| Root::new(view, window, cx))
+                            });
+
+                            global_state.update(cx, |this, cx|{
+                                this.dial_window_is_open = true;
+                            })
+                        }))
+
+                )
+                    .item(
+                        PopupMenuItem::new("添加好友")
+                            .on_click(window.listener_for(& entity_handle, |this, event, window, cx|{
+                                let global_state = cx.global::<GlobalState>().0.clone();
+                                if global_state.read(cx).dial_window_is_open{
+                                    return
+                                }
+
+                                let _ = cx.open_window(window_center_options(window, 600.,600.), move |window, app| {
+                                    let view = app.new(|cx| SearchGroupAndUserWindow::new(cx, window));
+                                    app.new(|cx| Root::new(view, window, cx))
+                                });
+
+                                global_state.update(cx, |this, cx|{
+                                    this.dial_window_is_open = true;
+                                })
+                            }))
+                    )
+
+
+            })
+    }
+
+    pub(crate) fn left_sidebar(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let entity_handle = cx.entity().clone();
         v_flex()
             .size_full()
             .w(px(self.left_panel_default_width))
@@ -217,72 +274,38 @@ impl MessagePage {
                     .p_2()
                     .child(Input::new(&self.search_input).w(px(235.)))
                     .child(
-                        Button::new("left-sidebar-btn_menu")
-                            .label("+")
-                            .mx_2()
-                            .dropdown_menu_with_anchor(Corner::TopLeft, move |menu, window, cx| {
-                                menu.item(
-                                    PopupMenuItem::new("创建群聊")
-                                        .on_click(window.listener_for(&entity_handle.clone(), |this, event, window, cx|{
-                                            let global_state = cx.global::<GlobalState>().0.clone();
-                                            if global_state.read(cx).dial_window_is_open{
-                                                return
-                                            }
-
-                                            let _ = cx.open_window(this.window_center_options(window, 350., 300.), move |window, app| {
-                                                let view = app.new(|cx| CreateGroupChatWindow::new(cx, window));
-                                                app.new(|cx| Root::new(view, window, cx))
-                                            });
-
-                                            global_state.update(cx, |this, cx|{
-                                                this.dial_window_is_open = true;
-                                            })
-                                        }))
-
-                                )
-                                    .item(
-                                        PopupMenuItem::new("添加好友")
-                                            .on_click(window.listener_for(& entity_handle, |this, event, window, cx|{
-                                                let global_state = cx.global::<GlobalState>().0.clone();
-                                                if global_state.read(cx).dial_window_is_open{
-                                                    return
-                                                }
-
-                                                let _ = cx.open_window(this.window_center_options(window, 600.,600.), move |window, app| {
-                                                    let view = app.new(|cx| SearchGroupAndUserWindow::new(cx, window));
-                                                    app.new(|cx| Root::new(view, window, cx))
-                                                });
-
-                                                global_state.update(cx, |this, cx|{
-                                                    this.dial_window_is_open = true;
-                                                })
-                                            }))
-                                    )
-
-
-                            })
+                        self.add_btn_menu(cx)
                     ),
             )
             .child(
-                self.left_sidebar_vm_list(cx)
+                h_flex()
+                    .size_full()
+                    .child(
+                        self.left_sidebar_vm_list(cx)
+                    )
+                    .child(
+                        Scrollbar::vertical(&self.message_group_scroll_handle)
+                            .scrollbar_show(ScrollbarShow::Always)
+                            .axis(ScrollbarAxis::Vertical),
+                    )
             )
             .context_menu(move |menu: PopupMenu, w: &mut Window, _cx: &mut Context<PopupMenu>| {
                     menu
                         .item(PopupMenuItem::new("置顶").on_click(w.listener_for(
-                        &entity_handle_2,
-                        |this, _ev, _w, _cx| {
+                        &entity_handle,
+                          |this, _, _, cx| {
 
                         },
                         )))
                         .item(PopupMenuItem::new("复制群号").on_click(w.listener_for(
-                            &entity_handle_2,
-                            |this, _ev, _w, _cx| {
+                            &entity_handle,
+                              |this, _, _, cx| {
 
                             },
                         )))
                         .item(PopupMenuItem::new("删除消息").on_click(w.listener_for(
-                            &entity_handle_2,
-                            |this, _ev, _w, _cx| {
+                            &entity_handle,
+                              |this, _, _, cx| {
 
                             },
                         )))
@@ -293,10 +316,6 @@ impl MessagePage {
                         })
                 },
             )
-            .child(
-                Scrollbar::vertical(&self.message_group_scroll_handle)
-                    .scrollbar_show(ScrollbarShow::Always)
-                    .axis(ScrollbarAxis::Vertical),
-            )
+
     }
 }

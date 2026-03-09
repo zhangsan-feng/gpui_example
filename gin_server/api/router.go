@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"gin_server/api/group"
 	"gin_server/api/user"
+	"gin_server/api/user_friend"
 	"github.com/gin-gonic/gin"
 	"io"
 	"log"
@@ -52,13 +53,14 @@ func NewHttpRouter(r *gin.Engine) {
 
 		c.Next()
 	})
-
+	//r.Group("/api/v1/user/")
 	r.GET("/user_message_group", user.MessageGroupApi)
-
 	r.POST("/user_send_message", user.UserSendMessageApi)
 	r.GET("/register_ws", RegisterWsConn)
 	r.POST("/user/login", user.LoginApi)
 	r.POST("/create_group_chat", group.CreateGroupChat)
 	r.POST("/search_group_and_user", user.SearchGroupAndUserApi)
 	r.POST("/join_group_chat", group.JoinGroupChatApi)
+	r.POST("/friends/add", friend.AddFriendApi)
+	r.POST("/friends/approve", friend.ApproveFriendApi)
 }

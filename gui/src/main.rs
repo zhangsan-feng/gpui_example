@@ -7,6 +7,7 @@ use std::sync::Arc;
 mod component;
 mod state;
 mod service;
+mod entity;
 
 use gpui::http_client::{RedirectPolicy, Request, Response, Url, anyhow, http};
 use reqwest_client::ReqwestClient;
@@ -40,11 +41,11 @@ pub  fn logger_init(logger_path: &str) {
             ))
         })
         .filter(|metadata| metadata.level() == Level::Info)
-        // .level(log::LevelFilter::Info)
-        // .level(log::LevelFilter::Error)
-        // .level(log::LevelFilter::Trace)
-        // .level(log::LevelFilter::Warn)
-        // .level(log::LevelFilter::Debug)
+        .level(log::LevelFilter::Info)
+        .level(log::LevelFilter::Error)
+        .level(log::LevelFilter::Trace)
+        .level(log::LevelFilter::Warn)
+        .level(log::LevelFilter::Debug)
         .chain(std::io::stdout());
         // .chain(fern::log_file(logfile_path).expect("Failed to create log file"));
     dispatch.apply().unwrap();

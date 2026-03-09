@@ -184,12 +184,11 @@ impl LoginView {
 
                     .on_mouse_down(
                         MouseButton::Left,
-                        cx.listener(|this, _, _, down_cx| {
-                            let mut async_cx = down_cx.to_async();
-                            let entity_view = down_cx.entity();
+                        cx.listener(|this, _, _, cx| {
+                            let mut async_cx = cx.to_async();
+                            let entity_view = cx.entity();
 
-                            down_cx
-                                .spawn(|_, _: &mut AsyncApp| async move {
+                            cx.spawn(|_, _: &mut AsyncApp| async move {
                                     let paths = entity_view.update(&mut async_cx, |this, cx| {
                                             cx.prompt_for_paths(PathPromptOptions {
                                                 files: true,

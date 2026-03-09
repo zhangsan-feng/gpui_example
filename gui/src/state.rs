@@ -1,11 +1,10 @@
-
+use std::io::{Bytes, Read};
 use std::time::Duration;
 use futures_util::{SinkExt, StreamExt};
 use gpui::{App, AppContext, AsyncApp, Context, Entity, EventEmitter, Global,};
+use std::default::Default;
 use log::info;
-
 use reqwest_client::runtime;
-
 use serde_json::json;
 use tokio::sync::mpsc;
 
@@ -28,7 +27,7 @@ pub struct State {
 #[derive(Clone)]
 pub enum EventBus {
     WebSocketText(String),
-    ChangeMessageGroupSelectIndex(usize),
+    ChildrenChangeSelectIndex
 }
 
 impl EventEmitter<EventBus> for State {}
@@ -69,10 +68,10 @@ impl State {
         let user_id = self.user_state.clone().user_id;
         let user_token = self.user_state.clone().user_token;
         let tokio_handler = self.tokio_handle.clone();
-        let (tx, mut rx) = mpsc::unbounded_channel::<WsTextMessage>();
+        let (w, mut r) = mpsc::unbounded_channel::<WsTextMessage>();
         
         cx.spawn(|_, _: &mut AsyncApp| async move {
-            while let Some(ws_msg) = rx.recv().await {
+            while let Some(ws_msg) = r.recv().await {
                 _ = entity.update(&mut async_cx, |_, cx| {
                     cx.emit(EventBus::WebSocketText(ws_msg.0));
                 });
@@ -80,9 +79,7 @@ impl State {
         }).detach();
         
         cx.spawn(|_, _: &mut AsyncApp| async move {
-
             tokio_handler.spawn(async move {
-
                 loop {
                     println!("Connecting to WebSocket server...");
                     match connect_async(url.clone()).await {
@@ -99,11 +96,22 @@ impl State {
                                 continue;
                             }
 
+                            tokio::spawn(async move {
+                                let mut interval = tokio::time::interval( Duration::from_secs(5));
+                                loop {
+                                    interval.tick().await;
+                                    // info!("tick ");
+                                    if let Err(e) = write.send(Message::Ping(tokio_util::bytes::Bytes::new())).await {
+                                        eprintln!("Heartbeat failed: {}", e);
+                                        break;
+                                    }
+                                }
+                            });
 
                             while let Some(msg) = read.next().await {
                                 match msg {
                                     Ok(Message::Text(text)) => {
-                                        if tx.send(WsTextMessage(text.to_string())).is_err() {
+                                        if w.send(WsTextMessage(text.to_string())).is_err() {
                                             println!("Channel closed, exiting WebSocket loop.");
                                             break;
                                         }
@@ -116,10 +124,11 @@ impl State {
                                         break;
                                     }
                                     Ok(Message::Ping(data)) => {
-                                        let _ = write.send(Message::Pong(data)).await;
+                                        // println!("recv server ping ");
+                                        // let _ = write.send(Message::Pong(data)).await;
                                     }
                                     Ok(Message::Pong(msg)) => {
-                                        println!("{:?}", msg)
+                                        // println!("{:?}", msg)
                                     }
                                     Err(e) => {
                                         eprintln!("Read error: {}", e);
@@ -128,20 +137,15 @@ impl State {
                                     _ => {}
                                 }
                             }
-
-                            println!("Connection lost. Reconnecting in 3 seconds...");
+                            println!("Connection lost. Reconnecting in 10 seconds...");
                         }
                         Err(e) => {
-                            eprintln!("Failed to connect: {}. Retrying in 3s...", e);
+                            eprintln!("Failed to connect: {}. Retrying in 10s...", e);
                         }
                     }
-
-                    tokio::time::sleep(Duration::from_secs(3)).await;
+                    tokio::time::sleep(Duration::from_secs(10)).await;
                 }
             });
-
         }).detach();
     }
-
-
 }

@@ -1,7 +1,9 @@
 package user
 
 import (
-	"gin_server/api/datastore"
+	"gin_server/datastore"
+	"gin_server/entity"
+	"gin_server/enum"
 	"github.com/gin-gonic/gin"
 	"github.com/gogf/gf/v2/os/gfile"
 	"github.com/gogf/gf/v2/util/gconv"
@@ -12,15 +14,15 @@ import (
 	"time"
 )
 
-type UserSendMessage struct {
+type UserSendMessageApiParams struct {
 	SendUserId  string `form:"send_user_id" binding:"required"`
 	SendGroupId string `form:"send_group_id" binding:"required"`
 	Message     string `form:"message"`
 }
 
 func UserSendMessageApi(r *gin.Context) {
-	var req *UserSendMessage
-	if bindError := r.ShouldBind(&req); bindError != nil {
+	params := &UserSendMessageApiParams{}
+	if bindError := r.ShouldBind(&params); bindError != nil {
 		log.Println(bindError)
 		return
 	}
@@ -54,46 +56,46 @@ func UserSendMessageApi(r *gin.Context) {
 		}
 	}
 
-	//AllUsers[req.SendUserId].Conn.WriteMessage(websocket.TextMessage, []byte(req.Message))
+	//AllUsers[req.SendUserId].WebSocketConn.WriteMessage(websocket.TextMessage, []byte(req.Message))
 	//if err := global.EventBus.Publish(event_bus.EventWebSocketMessage, gconv.String("")); err != nil {
 	//	log.Println(err)
 	//}
 
 	//log.Println(messageFiles)
-	if len(messageFiles) == 0 && len(req.Message) == 0 {
+	if len(messageFiles) == 0 && len(params.Message) == 0 {
 		return
 	}
 
-	group := datastore.AllGroup[req.SendGroupId]
+	group := datastore.AllGroup[params.SendGroupId]
 	if group == nil {
 		return
 	}
 	exist := false
 	for _, groupMember := range group.Members {
-		if groupMember.Id == req.SendUserId {
+		if groupMember.Id == params.SendUserId {
 			exist = true
 		}
 	}
 	if !exist {
-		groupMember := &datastore.GroupMembers{
+		groupMember := &entity.GroupMembers{
 			GroupId:  group.ID,
-			Id:       req.SendUserId,
-			Name:     datastore.AllUsers[req.SendUserId].Name,
-			Avatar:   datastore.AllUsers[req.SendUserId].Avatar,
+			Id:       params.SendUserId,
+			Name:     datastore.AllUsers[params.SendUserId].Name,
+			Avatar:   datastore.AllUsers[params.SendUserId].Avatar,
 			Usertype: "普通群员",
-			Status:   datastore.AllUsers[req.SendUserId].Status,
+			Status:   datastore.AllUsers[params.SendUserId].Status,
 		}
 
 		group.Members = append(group.Members, groupMember)
 		for _, v := range group.Members {
 			if datastore.AllUsers[v.Id] != nil {
 				log.Println(v.Name)
-				if datastore.AllUsers[v.Id].Conn != nil {
+				if datastore.AllUsers[v.Id].WebSocketConn != nil {
 					send := &datastore.WebSocketMessage{
-						Type: datastore.WsMsgOtherJoinGroupChat,
+						Type: enum.WsMsgOtherJoinGroupChat,
 						Data: groupMember,
 					}
-					if err := datastore.AllUsers[v.Id].Conn.WriteMessage(websocket.TextMessage, []byte(gconv.String(send))); err != nil {
+					if err := datastore.AllUsers[v.Id].WebSocketConn.WriteMessage(websocket.TextMessage, []byte(gconv.String(send))); err != nil {
 						log.Println(err)
 					}
 				}
@@ -102,14 +104,14 @@ func UserSendMessageApi(r *gin.Context) {
 
 	}
 
-	sendMsg := &datastore.GroupHistory{
+	sendMsg := &entity.GroupHistory{
 		GroupId:        group.ID,
 		MessageId:      uuid.New().String(),
-		SendGroupId:    req.SendGroupId,
-		SendUserId:     req.SendUserId,
-		SendUserName:   datastore.AllUsers[req.SendUserId].Name,
-		SendUserAvatar: datastore.AllUsers[req.SendUserId].Avatar,
-		Message:        req.Message,
+		SendGroupId:    params.SendGroupId,
+		SendUserId:     params.SendUserId,
+		SendUserName:   datastore.AllUsers[params.SendUserId].Name,
+		SendUserAvatar: datastore.AllUsers[params.SendUserId].Avatar,
+		Message:        params.Message,
 		Time:           time.Now().Format("2006-01-02 15:04:05"),
 		Files:          messageFiles,
 	}
@@ -121,15 +123,15 @@ func UserSendMessageApi(r *gin.Context) {
 
 	for _, v := range group.Members {
 		if datastore.AllUsers[v.Id] != nil {
-			if datastore.AllUsers[v.Id].Conn != nil {
+			if datastore.AllUsers[v.Id].WebSocketConn != nil {
 				//log.Println(v.Name)
 
 				//log.Println(gconv.String(sendMsg))
 				send := &datastore.WebSocketMessage{
-					Type: datastore.WsMsgTypeMessage,
+					Type: enum.WsMsgTypeMessage,
 					Data: sendMsg,
 				}
-				if err := datastore.AllUsers[v.Id].Conn.WriteMessage(websocket.TextMessage, []byte(gconv.String(send))); err != nil {
+				if err := datastore.AllUsers[v.Id].WebSocketConn.WriteMessage(websocket.TextMessage, []byte(gconv.String(send))); err != nil {
 					log.Println(err)
 				}
 			}

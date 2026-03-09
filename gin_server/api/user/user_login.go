@@ -1,23 +1,25 @@
 package user
 
 import (
-	"gin_server/api/datastore"
-	"gin_server/global"
+	"gin_server/datastore"
+	"gin_server/entity"
+	"gin_server/internal"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"log"
 	"math/rand"
+	"sync"
 	"time"
 )
 
-type LoginParams struct {
+type LoginApiParams struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
 func LoginApi(r *gin.Context) {
-	params := &LoginParams{}
+	params := &LoginApiParams{}
 
 	err := r.ShouldBind(params)
 	if err != nil {
@@ -29,7 +31,7 @@ func LoginApi(r *gin.Context) {
 		userUuid = val
 	}
 
-	token, err := global.GenerateJWT(&global.MyCustomClaims{
+	token, err := internal.GenerateJWT(&internal.MyCustomClaims{
 		Username:         params.Username,
 		UserAvatar:       "",
 		UserUuid:         userUuid,
@@ -45,12 +47,18 @@ func LoginApi(r *gin.Context) {
 	index := rand.Intn(len(datastore.UserAvatar))
 
 	if datastore.AllUsers[userUuid] == nil {
-		datastore.AllUsers[userUuid] = &datastore.User{
-			Id:     userUuid,
-			Name:   params.Username,
-			Avatar: datastore.UserAvatar[index],
-			Status: "在线",
-			Conn:   nil,
+		datastore.AllUsers[userUuid] = &entity.User{
+			Id:                       userUuid,
+			Name:                     params.Username,
+			Avatar:                   datastore.UserAvatar[index],
+			WebSocketConn:            nil,
+			Status:                   "在线",
+			MessageGroups:            []string{},
+			Friends:                  []*entity.FriendUser{},
+			FriendNotice:             []*entity.UserMessageNotice{},
+			RealTimeMessage:          nil,
+			CloseWebSocketConnSignal: nil,
+			Lock:                     &sync.Mutex{},
 		}
 	}
 

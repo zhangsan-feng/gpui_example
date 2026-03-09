@@ -1,10 +1,11 @@
 package group
 
 import (
-	"gin_server/api/datastore"
+	"gin_server/datastore"
+	"gin_server/entity"
+	"gin_server/enum"
 	"github.com/gin-gonic/gin"
 	"github.com/gogf/gf/v2/util/gconv"
-	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
 )
@@ -24,12 +25,13 @@ func JoinGroupChatApi(r *gin.Context) {
 	}
 	user := datastore.AllUsers[params.UserId]
 	group := datastore.AllGroup[params.GroupId]
+
 	flag1 := false
 	flag2 := false
 
 	if group != nil && user != nil {
 
-		groupMember := &datastore.GroupMembers{
+		groupMember := &entity.GroupMembers{
 			GroupId:  group.ID,
 			Id:       user.Id,
 			Name:     user.Name,
@@ -56,26 +58,25 @@ func JoinGroupChatApi(r *gin.Context) {
 			user.MessageGroups = append(user.MessageGroups, params.GroupId)
 		}
 
-		send := datastore.WebSocketMessage{
-			Type: datastore.WsMsgUserJoinGroupChat,
-			Data: group,
-		}
-		if err := datastore.AllUsers[params.UserId].Conn.WriteMessage(websocket.TextMessage, []byte(gconv.String(send))); err != nil {
-			log.Println(err)
-		}
+		datastore.AllUsers[params.UserId].RealTimeMessage <- []byte(gconv.String(
+			datastore.WebSocketMessage{
+				Type: enum.WsMsgUserJoinGroupChat,
+				Data: group,
+			}))
 
-		for _, _user := range group.Members {
-			if activeUser := datastore.AllUsers[_user.Id]; activeUser != nil {
+		for _, val := range group.Members {
+			if activeUser := datastore.AllUsers[val.Id]; activeUser != nil {
 
-				send := datastore.WebSocketMessage{
-					Type: datastore.WsMsgOtherJoinGroupChat,
-					Data: groupMember,
+				if activeUser.Id == params.UserId {
+					continue
 				}
-				//log.Println(_user.Id, _user.Name, group.Members)
 
-				if err := activeUser.Conn.WriteMessage(websocket.TextMessage, []byte(gconv.String(send))); err != nil {
-					log.Println(err)
-				}
+				activeUser.RealTimeMessage <- []byte(gconv.String(
+					datastore.WebSocketMessage{
+						Type: enum.WsMsgOtherJoinGroupChat,
+						Data: groupMember,
+					}))
+
 			}
 		}
 	}

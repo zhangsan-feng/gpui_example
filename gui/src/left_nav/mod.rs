@@ -121,7 +121,7 @@ impl Render for LeftNav {
                 move |menu: PopupMenu, w: &mut Window, _cx: &mut Context<PopupMenu>| {
                     menu.item(PopupMenuItem::new("新增1").on_click(w.listener_for(
                         &view,
-                        |this, _ev, _w, _cx| {
+                          |this, _, _, cx| {
 
                             // _cx.open_window(WindowOptions::default(), |window, cx| {
                             //     let view = cx.new(|_| session_window::SessionWindow {});
@@ -134,7 +134,7 @@ impl Render for LeftNav {
                     )))
                     .item(PopupMenuItem::new("新增2").on_click(w.listener_for(
                         &view,
-                        |this, _ev, _w, _cx| {
+                          |this, _, _, cx| {
                             println!("新增项目 - 当前选中: {:?}", this.select_id);
                             if let Some(parent_handle) = &this.parent {
                                 parent_handle.update(_cx, |parent_data, parent_cx| {

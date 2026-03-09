@@ -4,9 +4,10 @@ use gpui::*;
 use gpui_component::input::{InputState};
 use gpui_component::*;
 use gpui_component::divider::Divider;
+use gpui_component::dock::{Dock, DockArea};
 use log::{error, info};
 use serde::{Serialize};
-use crate::component::message_page::entity::{GroupHistory, GroupMembers, MessageGroup, WsMsgEvent};
+use crate::component::{GroupHistory, GroupMembers, MessageGroup, WsMsgEvent};
 use crate::component::message_page::group_chat_member::GroupMemberEntity;
 use crate::component::message_page::history_message::HistoryMessageEntity;
 use crate::component::message_page::send_message_entity::SendMessageEntity;
@@ -22,7 +23,6 @@ mod group_chat_member;
 mod send_message_entity;
 mod search_group_and_user_window;
 mod create_group_chat_window;
-mod entity;
 
 
 pub struct MessagePage {
@@ -65,7 +65,7 @@ impl Render for HistoryMessagePanelResizeHandle{
 
 impl MessagePage {
     pub fn new(cx: &mut Context<Self>, window: &mut Window) -> Self {
-        let mut s = MessagePage {
+        MessagePage {
             select_index: 0,
             message_group: Vec::new(),
             message_group_scroll_handle: VirtualListScrollHandle::new(),
@@ -79,201 +79,139 @@ impl MessagePage {
             sned_message_entity:cx.new(|cx|{SendMessageEntity::new(window, cx)}),
             history_message_entity:cx.new(|cx|HistoryMessageEntity::new(window, cx)),
             group_members_entity:cx.new(|cx|GroupMemberEntity::new(window, cx)),
-        };
+        }
+    }
 
+    pub fn update_component_data(&mut self, event: WsMsgEvent, cx: &mut Context<Self>){
 
-        let state_handle = cx.global::<GlobalState>().0.clone();
+        match event.msg_type.as_str() {
+            "message" => {
+                match serde_json::from_value::<GroupHistory>(event.data) {
+                    Ok(data) => {
+                        let data = data.clone();
+                        let group_id = data.group_id.clone();
+                        if let Some(index) = self.message_group.iter().position(|x| x.id == group_id) {
+                            self.message_group[index].history.push(data);
+                            let group = self.message_group[index].clone();
 
-        cx.subscribe(&state_handle, |this: &mut Self, _model, event: &EventBus, cx| {
-            match event {
-                EventBus::WebSocketText(txt)=>{
-                    println!("组件收到消息: {}", txt);
+                            self.history_message_entity.update(cx, |this, cx|{
+                                this.history_message = group.history.clone();
+                                this.scroll_handle.reset(group.history.len())
+                            });
 
-                    match serde_json::from_str::<WsMsgEvent>(&txt) {
-                        Ok(event) => {
-                            match event.msg_type.as_str() {
-                                "message" => {
-                                    match serde_json::from_value::<GroupHistory>(event.data) {
-                                        Ok(data) => {
-                                            let data = data.clone();
-                                            let group_id = data.group_id.clone();
-                                            if let Some(index) = this.message_group.iter().position(|x| x.id == group_id) {
-                                                this.message_group[index].history.push(data);
-                                                let group = this.message_group[index].clone();
-                                                if index != 0 {
-                                                    let group = this.message_group.remove(index);
-                                                    this.message_group.insert(0, group);
-                                                    this.select_index = 0;
-                                                }
-
-                                                this.history_message_entity.update(cx, |this, cx|{
-                                                    this.history_message = group.history.clone();
-                                                    this.scroll_handle.reset(group.history.len())
-                                                });
-
-                                                // this.history_message_scroll_handle.reset(
-                                                //     this.message_group[this.select_index].history.len(),
-                                                // );
-                                            }
-                                        }
-                                        Err(e) => {
-                                            eprintln!("Failed to parse data as GroupHistory: {}", e);
-                                        }
-                                    }
-                                }
-                                "create_group_chat"=>{
-                                    match serde_json::from_value::<MessageGroup>(event.data) {
-                                        Ok(data) => {
-                                            let group_id = data.id.clone();
-                                            let exist= this.message_group.iter().any(|x| x.id == group_id);
-                                            if !exist {
-                                                this.message_group.insert(0, data);
-
-                                                this.sned_message_entity.update(cx,|this,cx|{
-                                                    this.group_id = group_id.clone();
-                                                });
-                                                this.select_index = 0;
-                                                this.history_message_entity.update(cx, |this, cx|{
-                                                    this.history_message = Vec::new();
-                                                    this.scroll_handle.reset(0)
-                                                });
-                                            }
-
-                                        }
-                                        Err(e) => {
-                                            eprintln!("Failed to parse data as GroupHistory: {}", e);
-                                        }
-                                    }
-                                }
-                                "other_join_group_chat" => {
-                                    match serde_json::from_value::<GroupMembers>(event.data) {
-                                        Ok(data) => {
-                                            let data = data.clone();
-                                            let group_id = data.group_id.clone();
-                                            if let Some(index) = this.message_group.iter().position(|x| x.id == group_id) {
-                                                this.message_group[index].members.push(data.clone());
-                                                this.group_members_entity.update(cx, |this, cx|{
-                                                    this.group_users.push(data);
-                                                });
-
-                                                // if index != 0 {
-                                                //     this.history_message_entity.update(cx, |this, cx|{
-                                                //         this.history_message = Vec::new();
-                                                //         this.scroll_handle.reset(0)
-                                                //     });
-                                                //
-                                                //     let group = this.message_group.remove(index);
-                                                //     this.message_group.insert(0, group);
-                                                //     this.select_index = 0;
-                                                //
-                                                // }
-                                            }
-                                        }
-                                        Err(e) => {
-                                            eprintln!("Failed to parse data as GroupHistory: {}", e);
-                                        }
-                                    }
-                                }
-                                "user_join_group_chat"=>{
-                                    match serde_json::from_value::<MessageGroup>(event.data) {
-                                        Ok(data) => {
-                                            let group_id = data.id.clone();
-                                            let exist= this.message_group.iter().any(|x| x.id == group_id);
-                                            if !exist {
-                                                this.message_group.insert(0, data);
-                                                this.sned_message_entity.update(cx,|this,cx|{
-                                                    this.group_id = group_id.clone();
-                                                });
-                                                this.select_index = 0;
-                                            }
-                                        }
-                                        Err(e) => {
-                                            eprintln!("Failed to parse data as GroupHistory: {}", e);
-                                        }
-                                    }
-                                }
-
-                                unknown => {
-                                    println!("Unknown message type: {}", unknown);
-                                }
+                            if index != 0 {
+                                let group = self.message_group.remove(index);
+                                self.message_group.insert(0, group);
+                                self.select_index = 0;
                             }
                         }
-                        Err(e) => {
-                            eprintln!("Failed to parse WsMsgEvent: {} | Raw: {}", e, txt);
+                    }
+                    Err(e) => {
+                        info!("Failed to parse data as : {}", e);
+                    }
+                }
+            }
+            "create_group_chat"=>{
+                match serde_json::from_value::<MessageGroup>(event.data) {
+                    Ok(data) => {
+                        let group_id = data.id.clone();
+                        let exist= self.message_group.iter().any(|x| x.id == group_id);
+                        if !exist {
+
+                            self.sned_message_entity.update(cx,|this,cx|{
+                                this.group_id = group_id.clone();
+                            });
+                            self.history_message_entity.update(cx, |this, cx|{
+                                this.history_message = Vec::new();
+                                this.scroll_handle.reset(0)
+                            });
+                            self.group_members_entity.update(cx, |this, cx|{
+                                this.group_users = data.members.clone();
+                            });
+
+                            self.select_index = 0;
+                            self.message_group.insert(0, data);
+
+                        }
+
+                    }
+                    Err(e) => {
+                        info!("Failed to parse data as : {}", e);
+                    }
+                }
+            }
+            "other_join_group_chat" => {
+                match serde_json::from_value::<GroupMembers>(event.data) {
+                    Ok(data) => {
+                        let data = data.clone();
+                        let group_id = data.group_id.clone();
+                        if let Some(index) = self.message_group.iter().position(|x| x.id == group_id) {
+                            let exist = self.message_group[index].members. iter().any(|x| x.id == group_id);
+                            if !exist {
+                                self.message_group[index].members.push(data.clone());
+                            }
                         }
                     }
-                }
-                _ => {}
-            }
-
-        }).detach();
-
-
-        s.init_message_data(cx);
-        s
-    }
-
-    pub fn update_component_data(&self){
-
-    }
-    pub fn update_data_position(){
-
-    }
-
-    pub fn init_message_data(&self, cx: &mut Context<Self>) {
-        let global_state = cx.global::<GlobalState>().0.clone().read(cx);
-        let user_id = global_state.user_state.user_id.clone();
-        let tokio_handler = global_state.tokio_handle.clone();
-        let address = global_state.http_server.clone();
-
-        let mut cx_async = cx.to_async().clone();
-        let entity = cx.entity().clone();
-        // info!("{}", user_id);
-
-        cx.spawn( |_, _: &mut AsyncApp| async move {
-            let res = tokio_handler.spawn(async move {
-                http_request::HttpClient::new().get(format!("{}/user_message_group?user_id={}", address, user_id)).await
-            });
-            match res.await {
-                Ok(Ok(r)) => {
-                    match serde_json::from_value::<Vec<MessageGroup>>(r.data)  {
-                        Ok(data)=>{
-                            entity.update(&mut cx_async, |this, cx| {
-                                this.message_group = data.clone();
-                                match data.first() {
-                                    Some(first_data)=>{
-                                        this.history_message_entity.update(cx, |this, cx|{
-                                            this.history_message = first_data.history.clone();
-                                            this.scroll_handle.reset(first_data.history.len());
-                                        });
-                                        this.sned_message_entity.update(cx, |this, cx|{
-                                            this.group_id = first_data.id.clone()
-                                        });
-                                        this.group_members_entity.update(cx, |this, cx|{
-                                            this.group_users = first_data.members.clone();
-                                            this.group_type = first_data.group_type.clone();
-                                        });
-                                        this.click_column.insert(first_data.id.clone(), 0);
-
-                                    },
-                                    _=>{}
-                                }
-                            });
-                        },
-                        Err(e)=>{error!("{}",e)}
+                    Err(e) => {
+                        info!("Failed to parse data as : {}", e);
                     }
                 }
-                Ok(Err(e)) => error!("http error: {:?}", e),
-                Err(e) => error!("tokio runtime error: {:?}", e),
+            }
+            "user_join_group_chat"=>{
+                match serde_json::from_value::<MessageGroup>(event.data) {
+                    Ok(data) => {
+                        let group_id = data.id.clone();
+                        let exist= self.message_group.iter().any(|x| x.id == group_id);
+                        if !exist {
+                            self.sned_message_entity.update(cx,|this,cx|{
+                                this.group_id = group_id.clone();
+                            });
+                            self.history_message_entity.update(cx, |this, cx|{
+                                this.history_message = data.history.clone();
+                                this.scroll_handle.reset(data.history.len())
+                            });
+                            self.group_members_entity.update(cx, |this, cx|{
+                                this.group_users = data.members.clone();
+                            });
+
+                            self.select_index = 0;
+                            self.message_group.insert(0, data);
+                        }
+                    }
+                    Err(e) => {
+                        info!("Failed to parse data as : {}", e);
+                    }
+                }
             }
 
-
-
-
-        }).detach();
-
+            unknown => {
+                info!("Unknown message type: {}", unknown);
+            }
+        }
     }
 
+
+    pub fn init_component_data(&mut self, data:Vec<MessageGroup>, cx: &mut Context<Self>){
+        self.message_group = data.clone();
+        match data.first() {
+            Some(first_data)=>{
+                self.history_message_entity.update(cx, |this, cx|{
+                    this.history_message = first_data.history.clone();
+                    this.scroll_handle.reset(first_data.history.len());
+                });
+                self.sned_message_entity.update(cx, |this, cx|{
+                    this.group_id = first_data.id.clone()
+                });
+                self.group_members_entity.update(cx, |this, cx|{
+                    this.group_users = first_data.members.clone();
+                    this.group_type = first_data.group_type.clone();
+                });
+                self.click_column.insert(first_data.id.clone(), 0);
+
+            },
+            _=>{}
+        }
+    }
 
     fn left_panel_handle_resize(&mut self, event: &DragMoveEvent<LeftPanelResizeHandle>, cx: &mut Context<Self>) {
         let mouse_x = event.event.position.x;
@@ -303,7 +241,6 @@ impl MessagePage {
         });
     }
 }
-
 
 
 impl Render for MessagePage {
@@ -349,7 +286,6 @@ impl Render for MessagePage {
                             )
                             .child(div().flex_grow())
                             .child("1111")
-
                     )
                     .child(Divider::horizontal().w_full())
                     .child(
@@ -359,6 +295,7 @@ impl Render for MessagePage {
                             h_flex()
                                 .size_full()
                                 .child(
+
                                     v_flex()
                                         .size_full()
                                         .child(
@@ -392,10 +329,8 @@ impl Render for MessagePage {
                                     self.group_members_entity.clone()
                                 )
                         }
-
                     )
                     .into_any_element()
             )
-
     }
 }

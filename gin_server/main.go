@@ -3,9 +3,9 @@ package main
 import (
 	"bufio"
 	"gin_server/api"
-	"gin_server/api/datastore"
+	"gin_server/datastore"
 	"gin_server/event_bus"
-	"gin_server/global"
+	"gin_server/internal"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/gin-gonic/gin"
 	"io"
@@ -24,7 +24,7 @@ type FileHook struct {
 
 func NewFileHook() *FileHook {
 	w := &FileHook{ch: make(chan []byte, 4096)}
-	go w.processLogs()
+	go w.handler()
 	return w
 }
 
@@ -46,7 +46,7 @@ func (w *FileHook) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func (w *FileHook) processLogs() {
+func (w *FileHook) handler() {
 
 	defer func() {
 		if w.logFile != nil {
@@ -87,7 +87,7 @@ func init() {
 			}
 		}()
 
-		global.EventBus.RegisterEventHandler(event_bus.EventWebSocketMessage, false, func(msg *message.Message) {
+		internal.EventBus.RegisterEventHandler(event_bus.EventWebSocketMessage, false, func(msg *message.Message) {
 			log.Println(string(msg.Payload))
 		})
 	}()
@@ -112,7 +112,6 @@ func main() {
 	log.SetOutput(logWriterHandler)
 
 	gin.SetMode(gin.ReleaseMode)
-	go api.CheckWebsocketConn()
 
 	engine := gin.Default()
 	api.NewHttpRouter(engine)
