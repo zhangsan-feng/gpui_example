@@ -127,6 +127,7 @@ impl MessagePage {
                             });
                             self.group_members_entity.update(cx, |this, cx|{
                                 this.group_users = data.members.clone();
+                                this.group_type = data.group_type.clone();
                             });
 
                             self.select_index = 0;

@@ -6,13 +6,14 @@ import (
 	"gin_server/datastore"
 	"gin_server/event_bus"
 	"gin_server/internal"
-	"github.com/ThreeDotsLabs/watermill/message"
-	"github.com/gin-gonic/gin"
 	"io"
 	"log"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/gin-gonic/gin"
 )
 
 type FileHook struct {
@@ -94,6 +95,7 @@ func init() {
 }
 
 func main() {
+
 	defer func() {
 		if err := recover(); err != nil {
 			log.Println(err)

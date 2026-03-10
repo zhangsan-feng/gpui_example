@@ -35,8 +35,7 @@ impl GroupMemberEntity {
 impl Render for GroupMemberEntity {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let entity_handle = cx.entity().clone();
-
-
+        
         if self.group_users.len() != 0 && self.group_type == "private_chat"{
             div().into_any_element()
         }else{

@@ -43,6 +43,7 @@ impl FriendPage{
         self.friends = data.clone();
     }
 
+    
     pub fn update_component_data(&mut self, event: WsMsgEvent, cx: &mut Context<Self>){
         match event.msg_type.as_str() {
             "add_friend"=>{

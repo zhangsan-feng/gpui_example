@@ -4,3 +4,5 @@
 支持创建群聊和搜索添加群聊
 
 ![example.png](example.png)
+![0.png](0.png)
+![1.png](1.png)
