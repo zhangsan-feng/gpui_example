@@ -1,11 +1,18 @@
-package datastore
+﻿package datastore
 
 import (
 	"gin_server/entity"
-	"github.com/google/uuid"
 	"log"
 	"os"
+
+	"github.com/google/uuid"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
+
+var db *gorm.DB
+var err error
 
 var AllGroup map[string]*entity.MessageGroup
 var AllUsers map[string]*entity.User
@@ -20,6 +27,31 @@ type WebSocketMessage struct {
 const StaticAddress = "http://127.0.0.1:34332"
 
 func InitData() {
+	db, err = gorm.Open(sqlite.Open("./sqlite.db?cache=shared&_fk=1"), &gorm.Config{
+		Logger: logger.New(
+			log.New(os.Stdout, "\r\n", log.LstdFlags),
+			logger.Config{
+				LogLevel: logger.Info,
+			},
+		),
+	})
+	if err != nil {
+		panic("连接SQLite数据库失败: " + err.Error())
+	}
+
+	sqls := []string{
+		CreateUsersTableSQL,
+		CreateGroupsTableSQL,
+		CreateFriendsTableSQL,
+		CreateGroupMembersTableSQL,
+		CreateGroupHistoryTableSQL,
+	}
+	for _, sql := range sqls {
+		if execErr := db.Exec(sql).Error; execErr != nil {
+			panic("SQLite exec failed: " + execErr.Error())
+		}
+	}
+
 	AllGroup = make(map[string]*entity.MessageGroup)
 	AllUsers = make(map[string]*entity.User)
 	UserMapper = make(map[string]string)
@@ -59,8 +91,7 @@ func InitData() {
 			WebSocketConn:   nil,
 			Status:          "",
 			MessageGroups:   []string{},
-			Friends:         []*entity.FriendUser{},
-			FriendNotice:    []*entity.UserMessageNotice{},
+			Friends:         []*entity.Friends{},
 			RealTimeMessage: make(chan []byte, 1024),
 		}
 		AllUsers[userUuid] = userData

@@ -247,6 +247,8 @@ impl MessagePage {
 impl Render for MessagePage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
 
+        
+
         h_flex()
             .size_full()
             .child(

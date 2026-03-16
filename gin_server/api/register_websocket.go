@@ -30,9 +30,13 @@ func RegisterWsConn(r *gin.Context) {
 	id := gconv.String(gconv.Map(string(msg))["id"])
 
 	if datastore.AllUsers[id] != nil {
+		if datastore.AllUsers[id].WebSocketConn != nil {
+			datastore.AllUsers[id].CloseWebSocketConnSignal <- struct{}{}
+		}
+		
 		datastore.AllUsers[id].WebSocketConn = conn
-		datastore.AllUsers[id].CloseWebSocketConnSignal = make(chan struct{})
 		datastore.AllUsers[id].RealTimeMessage = make(chan []byte, 1024)
+		datastore.AllUsers[id].CloseWebSocketConnSignal = make(chan struct{})
 		go datastore.AllUsers[id].WebSocketConnWrite()
 		go datastore.AllUsers[id].WebSocketConnRead()
 	} else {

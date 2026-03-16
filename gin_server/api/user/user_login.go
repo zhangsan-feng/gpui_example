@@ -48,17 +48,14 @@ func LoginApi(r *gin.Context) {
 
 	if datastore.AllUsers[userUuid] == nil {
 		datastore.AllUsers[userUuid] = &entity.User{
-			Id:                       userUuid,
-			Name:                     params.Username,
-			Avatar:                   datastore.UserAvatar[index],
-			WebSocketConn:            nil,
-			Status:                   "在线",
-			MessageGroups:            []string{},
-			Friends:                  []*entity.FriendUser{},
-			FriendNotice:             []*entity.UserMessageNotice{},
-			RealTimeMessage:          nil,
-			CloseWebSocketConnSignal: nil,
-			Lock:                     &sync.Mutex{},
+			Id:            userUuid,
+			Name:          params.Username,
+			Avatar:        datastore.UserAvatar[index],
+			WebSocketConn: nil,
+			Status:        "在线",
+			MessageGroups: []string{},
+			Friends:       []*entity.Friends{},
+			Lock:          &sync.Mutex{},
 		}
 	}
 

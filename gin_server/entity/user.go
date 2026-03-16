@@ -7,23 +7,38 @@ import (
 	"time"
 )
 
-type UserDetailInfo struct {
-	Friends       []*FriendUser   `json:"friends"`
-	MessageGroups []*MessageGroup `json:"message_groups"`
+type Groups struct {
+	Id     string `json:"id"`
+	Name   string `json:"name"`
+	Avatar string `json:"avatar"`
 }
 
+type Friends struct {
+	Id     string `json:"id"`
+	Name   string `json:"name"`
+	Avatar string `json:"avatar"`
+}
+
+type UserDetail struct {
+	Friends  []*Friends `json:"friends"`
+	Groups   []*Groups
+	Sessions []*MessageGroup `json:"message_groups"`
+}
+
+type UserGroup struct{}
+
 type User struct {
-	Id                       string               `json:"id"`
-	Name                     string               `json:"name"`
-	Avatar                   string               `json:"avatar"`
-	Status                   string               `json:"state"`
-	MessageGroups            []string             `json:"message_groups"`
-	Friends                  []*FriendUser        `json:"friends"`
-	FriendNotice             []*UserMessageNotice `json:"notice"`
-	WebSocketConn            *websocket.Conn      `json:"-"`
-	RealTimeMessage          chan []byte          `json:"-"`
-	CloseWebSocketConnSignal chan struct{}        `json:"-"`
-	Lock                     *sync.Mutex          `json:"-"`
+	Id                       string          `json:"id"`
+	Name                     string          `json:"name"`
+	Avatar                   string          `json:"avatar"`
+	Status                   string          `json:"state"`
+	MessageGroups            []string        `json:"message_groups"`
+	Friends                  []*Friends      `json:"friends"`
+	Groups                   []*Groups       `json:"groups"`
+	WebSocketConn            *websocket.Conn `json:"-"`
+	RealTimeMessage          chan []byte     `json:"-"`
+	CloseWebSocketConnSignal chan struct{}   `json:"-"`
+	Lock                     *sync.Mutex     `json:"-"`
 }
 
 func (u *User) WebSocketConnWrite() {
@@ -81,18 +96,4 @@ func (u *User) WebSocketConnRead() {
 			break
 		}
 	}
-}
-
-type FriendUser struct {
-	Id     string `json:"id"`
-	Name   string `json:"name"`
-	Avatar string `json:"avatar"`
-	Status string `json:"state"`
-}
-
-type UserMessageNotice struct {
-	Id         string      `json:"id"`
-	SelfUser   *FriendUser `json:"self_user"`
-	FriendUser *FriendUser `json:"friend_user"`
-	Status     string      `json:"state"`
 }

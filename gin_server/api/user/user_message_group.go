@@ -11,16 +11,16 @@ func MessageGroupApi(r *gin.Context) {
 	//log.Println(user_id)
 	user := datastore.AllUsers[userId]
 	//log.Println(user)
-	data := entity.UserDetailInfo{
-		Friends:       []*entity.FriendUser{},
-		MessageGroups: []*entity.MessageGroup{},
+	data := entity.UserDetail{
+		Friends:  []*entity.Friends{},
+		Groups:   []*entity.Groups{},
+		Sessions: []*entity.MessageGroup{},
 	}
 	if user != nil {
 		for _, val := range user.MessageGroups {
-			data.MessageGroups = append(data.MessageGroups, datastore.AllGroup[val])
+			data.Sessions = append(data.Sessions, datastore.AllGroup[val])
 		}
 		for _, val := range user.Friends {
-			val.Status = ""
 			data.Friends = append(data.Friends, val)
 		}
 	}

@@ -218,8 +218,7 @@ impl Render for FriendPage {
                                 response
                             });
                             match res.await {
-                                Ok(Ok(r)) => {
-                                }
+                                Ok(Ok(r)) => {}
                                 Ok(Err(e)) => println!("http error: {:?}", e),
                                 Err(e) => println!("tokio runtime error: {:?}", e),
                             }

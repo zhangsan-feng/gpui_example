@@ -27,7 +27,7 @@ pub struct SendMessageEntity {
 impl SendMessageEntity {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         SendMessageEntity {
-            text_input: cx.new(|cx| InputState::new(window, cx)),
+            text_input: cx.new(|cx| InputState::new(window, cx).multi_line(true)),
             pick_send_files: Vec::new(),
             group_id: String::new(),
             panel_height: 160.0,

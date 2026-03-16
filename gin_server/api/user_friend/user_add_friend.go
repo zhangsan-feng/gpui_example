@@ -42,17 +42,15 @@ func AddFriendApi(r *gin.Context) {
 		return
 	}
 
-	self := &entity.FriendUser{
+	self := &entity.Friends{
 		Id:     selfUser.Id,
 		Name:   selfUser.Name,
 		Avatar: selfUser.Avatar,
-		Status: selfUser.Status,
 	}
-	friend := &entity.FriendUser{
+	friend := &entity.Friends{
 		Id:     friendUser.Id,
 		Name:   friendUser.Name,
 		Avatar: friendUser.Avatar,
-		Status: friendUser.Status,
 	}
 
 	selfUser.Friends = append(selfUser.Friends, friend)
